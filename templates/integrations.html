@@ -1,0 +1,84 @@
+{% extends "base.html" %}{% block content %}
+<div class="row g-3">
+  <div class="col-12 col-xl-7">
+    <div class="card h-100">
+      <div class="card-header py-3 px-4 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-briefcase me-2 text-primary"></i>Job Portal Partners</span>
+        <span class="badge text-bg-light">{{portals|length}} portals</span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">Connect your ATS workflow with external job portals. The portal handoff opens the configured recruiter page; automatic API posting can be added when the portal provides approved API credentials.</p>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead><tr><th>Portal</th><th>Status</th><th>Recruiter Portal</th><th class="text-end">Action</th></tr></thead>
+            <tbody>
+            {% for p in portals %}
+            <tr>
+              <td><b>{{p.name}}</b><div class="small text-muted">{{p.notes or ''}}</div></td>
+              <td>{% if p.enabled %}<span class="badge text-bg-success">Enabled</span>{% else %}<span class="badge text-bg-secondary">Disabled</span>{% endif %}</td>
+              <td>{% if p.posting_url %}<a href="{{p.posting_url}}" target="_blank" rel="noopener">Open portal <i class="bi bi-box-arrow-up-right"></i></a>{% elif p.website %}<a href="{{p.website}}" target="_blank" rel="noopener">Website</a>{% endif %}</td>
+              <td class="text-end">
+                {% if can_manage_users or user.role in ['Admin','Recruiter','Manager'] %}
+                <form method="post" action="{{url_for('toggle_job_portal',pid=p.id)}}" class="d-inline"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><button class="btn btn-sm btn-outline-secondary">{{'Disable' if p.enabled else 'Enable'}}</button></form>
+                <form method="post" action="{{url_for('delete_job_portal',pid=p.id)}}" class="d-inline" onsubmit="return confirm('Remove this portal partner?');"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if user.role in ['Admin','Recruiter','Manager'] %}
+        <form class="row g-2 border-top pt-3 mt-2" method="post" action="{{url_for('add_job_portal')}}">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div class="col-md-4"><input class="form-control" name="name" placeholder="Portal name" required></div>
+          <div class="col-md-4"><input class="form-control" name="website" placeholder="Website"></div>
+          <div class="col-md-4"><input class="form-control" name="posting_url" placeholder="Recruiter / posting URL"></div>
+          <div class="col-12"><input class="form-control" name="notes" placeholder="Integration notes"></div>
+          <div class="col-12"><button class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Add Portal Partner</button></div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-5">
+    <div class="card h-100">
+      <div class="card-header py-3 px-4"><i class="bi bi-send me-2 text-primary"></i>Prepare Job for Portal</div>
+      <div class="card-body">
+        <form method="post" action="{{url_for('create_job_portal_post')}}" class="row g-3">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div class="col-12"><label class="form-label">Job</label><select class="form-select" name="job_id" required><option value="">Select job</option>{% for j in jobs %}<option value="{{j.id}}">{{j.title}} — {{j.status}}</option>{% endfor %}</select></div>
+          <div class="col-12"><label class="form-label">Portal</label><select class="form-select" name="portal_id" required><option value="">Select portal</option>{% for p in portals if p.enabled %}<option value="{{p.id}}">{{p.name}}</option>{% endfor %}</select></div>
+          <div class="col-12"><button class="btn btn-primary w-100"><i class="bi bi-box-arrow-up-right me-1"></i>Prepare Posting</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header py-3 px-4"><i class="bi bi-list-check me-2 text-primary"></i>Portal Posting Queue</div>
+  <div class="card-body p-0">
+    <div class="table-responsive"><table class="table mb-0">
+      <thead><tr><th class="ps-4">Job</th><th>Portal</th><th>Status</th><th>External URL</th><th>Created</th></tr></thead>
+      <tbody>{% for p in posts %}<tr><td class="ps-4">{{p.job_title}}</td><td>{{p.portal_name}}</td><td><span class="badge text-bg-light">{{p.status}}</span></td><td>{% if p.external_url %}<a href="{{p.external_url}}" target="_blank">Open</a>{% else %}Not published{% endif %}</td><td>{{p.created_at}}</td></tr>{% else %}<tr><td colspan="5" class="text-muted ps-4">No portal postings prepared yet.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header py-3 px-4 d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-camera-video me-2 text-primary"></i>Online Interview Portal</span>
+    <span class="small text-muted">Microsoft Teams, Google Meet, Zoom or any meeting link</span>
+  </div>
+  <div class="card-body p-4">
+    <p class="text-muted">Create an online interview from <b>Interviews</b>, choose Microsoft Teams, Google Meet, Zoom or Custom Meeting and paste the invite link. You can change the link later with the pencil button on the interview. Candidates and interviewers get a one-click Join button.</p>
+    <div class="row g-3">
+      <div class="col-md-4"><div class="p-3 border rounded"><i class="bi bi-camera-video fs-4 text-primary"></i><h6 class="mt-2">Google Meet / Zoom</h6><div class="small text-muted">Paste a Google Meet or Zoom invite link on the interview.</div></div></div>
+      <div class="col-md-4"><div class="p-3 border rounded"><i class="bi bi-microsoft-teams fs-4 text-primary"></i><h6 class="mt-2">Microsoft Teams</h6><div class="small text-muted">Paste a Teams meeting URL and candidates/interviewers get a one-click Join button.</div></div></div>
+      <div class="col-md-4"><div class="p-3 border rounded"><i class="bi bi-stars fs-4 text-primary"></i><h6 class="mt-2">AI Interview Assistant</h6><div class="small text-muted">Generate questions and evaluate interviewer notes against the job and resume.</div></div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

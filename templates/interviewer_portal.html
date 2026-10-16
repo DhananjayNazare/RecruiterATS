@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% block content %}
+{% include "_portal_navbar.html" %}
+<div class="rt-portal" id="interviewerPortal">
+  <section class="rt-portal-hero">
+    <div class="rt-portal-avatar"><i class="bi bi-person-video3"></i></div>
+    <div class="rt-portal-intro"><div class="rt-portal-eyebrow">INTERVIEWER WORKSPACE</div><h2>Welcome, {{user.name}}</h2><p>Review your assigned interviews, candidate resumes, role details and meeting links.</p></div>
+    <a class="btn btn-outline-secondary rt-portal-logout" href="{{url_for('logout')}}"><i class="bi bi-box-arrow-right me-1"></i>Log out</a>
+  </section>
+  <section class="rt-portal-stats">
+    <div class="rt-portal-stat"><span><i class="bi bi-calendar2-week"></i> Assigned interviews</span><b>{{stats.total or 0}}</b></div>
+    <div class="rt-portal-stat"><span><i class="bi bi-clock"></i> Scheduled</span><b>{{stats.scheduled or 0}}</b></div>
+    <div class="rt-portal-stat"><span><i class="bi bi-check-circle"></i> Completed</span><b>{{stats.completed or 0}}</b></div>
+  </section>
+  <section class="rt-portal-section" id="my-scheduled-interviews">
+    <div class="rt-portal-section-head"><div><div class="rt-portal-eyebrow">YOUR CALENDAR</div><h3>My Scheduled Interviews</h3><p>Open candidate details separately from the external meeting room.</p></div></div>
+    {% if interviews %}
+    <div class="rt-portal-interviews">
+      {% for i in interviews %}
+      <article class="rt-portal-interview-card">
+        <div class="rt-portal-interview-icon"><i class="bi bi-person-video3"></i></div>
+        <div class="rt-portal-interview-main">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><h4>{{i.candidate}}</h4><span class="badge">{{i.status}}</span></div>
+          <div class="rt-portal-muted">{{i.candidate_email or 'No candidate email'}} · {{i.job}}</div>
+          <div class="rt-portal-interview-meta"><span><i class="bi bi-calendar-event me-1"></i>{{i.scheduled_at or 'Time not confirmed'}}</span><span><i class="bi bi-layers me-1"></i>{{i.round_name or 'Interview round'}}</span><span><i class="bi bi-camera-video me-1"></i>{{i.mode or '—'}}</span></div>
+          <div class="d-flex flex-wrap gap-2 mt-3"><a class="btn btn-primary btn-sm" href="{{url_for('interviewer_interview',iid=i.id)}}"><i class="bi bi-person-lines-fill me-1"></i>Candidate details</a>{% if i.meeting_link %}<a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" href="{{i.meeting_link}}"><i class="bi bi-box-arrow-up-right me-1"></i>Join meeting</a>{% endif %}</div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}<div class="rt-portal-empty"><i class="bi bi-calendar-x"></i><b>No interviews assigned</b><span>Your assigned interview schedule will appear here.</span></div>{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,211 @@
+{% extends "base.html" %}{% block content %}
+<div class="page-heading-row">
+  <div><div class="eyebrow">OVERVIEW</div><h2>Good morning, {{user.name}}</h2><p>Here’s what is happening across your recruitment pipeline.</p></div>
+  <div class="page-heading-actions">
+    <div class="dropdown">
+      <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-lightning-charge-fill me-1"></i>Quick Actions</button>
+      <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="min-width:290px">
+        {% if can_manage_jobs %}<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#createPositionModal"><i class="bi bi-plus-lg me-2"></i>Create Position</button></li>
+        {% else %}<li><a class="dropdown-item" href="{{url_for('jobs')}}"><i class="bi bi-briefcase me-2"></i>Positions</a></li>{% endif %}
+        <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#batchResumeModal"><i class="bi bi-files me-2"></i>Batch Resume Processing</button></li>
+        {% if can_apps %}<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addApplicationModal"><i class="bi bi-file-earmark-plus me-2"></i>Add Application</button></li>{% endif %}
+        {% if can_interviews %}<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#createInterviewModal"><i class="bi bi-calendar-plus me-2"></i>Create Interview</button></li>{% endif %}
+        {% if can_send_emails %}<li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#emailSchedulerModal"><i class="bi bi-envelope-paper me-2"></i>Status Update Email Scheduler</button></li>{% endif %}
+        <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#todosModal"><i class="bi bi-check2-square me-2"></i>To-Dos{% if todos %} <span class="badge text-bg-secondary ms-1">{{todos|length}}</span>{% endif %}</button></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{{url_for('calendar_view')}}"><i class="bi bi-calendar3 me-2"></i>View Calendar</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+<div class="kpi-grid mb-4">
+{% for key,label,icon in [('candidates','Total Candidates','bi-people-fill'),('applications','Applications','bi-file-earmark-text-fill'),('interviews','Interviews Scheduled','bi-calendar2-check-fill'),('jobs','Open Positions','bi-briefcase-fill')] %}
+{% set t = trends[key] %}
+<div class="kpi-card"><div class="kpi-top"><span>{{label}}</span><span class="kpi-icon"><i class="bi {{icon}}"></i></span></div><div class="kpi-value">{{stats[key]}}</div><div class="kpi-trend kpi-{{t.direction}}" title="{{t.tip}}"><i class="bi {{ 'bi-arrow-up' if t.direction=='up' else ('bi-arrow-down' if t.direction=='down' else 'bi-dash') }}"></i> {{t.label}} <span>vs last month</span></div></div>
+{% endfor %}
+</div>
+<div class="row g-4">
+  <div class="col-12 col-lg-6"><div class="modern-card h-100"><div class="modern-card-head"><div><h3>Hiring Funnel</h3><p>Track candidates through the recruitment pipeline.</p></div><a href="{{url_for('applications')}}" class="small-link">Applications <i class="bi bi-arrow-right"></i></a></div><div class="table-responsive table-modern"><table class="table mb-0"><thead><tr><th>Status</th><th>Applications</th><th>%</th></tr></thead><tbody>{% set funnel_total = stats.applications or 0 %}{% for x in funnel %}<tr><td>{{x.status}}</td><td>{{x.c}}</td><td>{{((x.c / funnel_total * 100) if funnel_total else 0)|round(1)}}%</td></tr>{% else %}<tr><td colspan="3" class="empty-state">No applications yet.</td></tr>{% endfor %}</tbody></table></div></div></div>
+  <div class="col-12 col-lg-6"><div class="modern-card h-100"><div class="modern-card-head"><div><h3>Upcoming Interviews</h3><p>Keep your next conversations on track</p></div><a href="{{url_for('calendar_view')}}" class="small-link">Calendar <i class="bi bi-arrow-right"></i></a></div><div class="upcoming-list">{% for r in upcoming %}<div class="upcoming-item"><div class="avatar-sm">{{r.candidate[:1]|upper}}</div><div class="upcoming-copy"><b>{{r.candidate}}</b><span>{{r.job}}{% if r.interviewer %} · {{r.interviewer}}{% endif %}</span></div><span class="status-pill">{{r.scheduled_at|replace('T',' ')}} · {{r.status}}</span></div>{% else %}<div class="empty-state">No upcoming interviews.</div>{% endfor %}</div></div></div>
+</div>
+<div class="modern-card mt-4"><div class="modern-card-head"><div><h3>Recent Applications</h3><p>Latest candidates entering your ATS</p></div><a href="{{url_for('applications')}}" class="btn btn-sm btn-outline-primary">Manage Applications</a></div><div class="table-responsive table-modern"><table class="table mb-0"><thead><tr><th>Candidate</th><th>Position</th><th>Status</th><th>AI Score</th></tr></thead><tbody>{% for r in recent %}<tr><td><div class="table-person"><div class="avatar-sm">{{r.candidate[:1]|upper}}</div><b>{{r.candidate}}</b></div></td><td>{{r.job}}</td><td><span class="status-pill">{{r.status}}</span></td><td><strong>{{r.match_score or '—'}}</strong></td></tr>{% else %}<tr><td colspan="4" class="empty-state">No applications yet.</td></tr>{% endfor %}</tbody></table></div></div>
+
+<div class="modal fade" id="batchResumeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-files me-2 text-primary"></i>Batch Resume Processing <small class="text-muted fw-normal ms-2">Up to 10 resumes at once</small></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body">
+      {% set bw_id='batchWidget' %}
+      {% include '_batch_widget.html' %}
+    </div>
+  </div></div>
+</div>
+
+<div class="modal fade" id="todosModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-check2-square me-2 text-primary"></i>To-Dos</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body">
+      <form class="row g-2 mb-3" method="post" action="{{url_for('todo_add')}}">
+        <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+        <div class="col-12 col-md-7"><input class="form-control" name="title" placeholder="Task" required></div>
+        <div class="col-8 col-md-3"><input type="date" class="form-control" name="due_date"></div>
+        <div class="col-4 col-md-2"><button class="btn btn-primary w-100">Add</button></div>
+      </form>
+      <div class="table-responsive">
+      <table class="table mb-0">
+        <tr><th>Task</th><th>Due</th><th>Status</th><th>Actions</th></tr>
+        {% for t in todos %}
+        <tr>
+          <td>{{t.title}}</td><td>{{t.due_date}}</td><td><span class="pill">{{t.status}}</span></td>
+          <td class="d-flex gap-1">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('todo-edit-{{t.id}}').classList.toggle('d-none')"><i class="bi bi-pencil-square me-1"></i>Edit</button>
+            <form method="post" action="{{url_for('delete_todo',tid=t.id)}}" onsubmit="return confirm('Delete this to-do?');">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>Delete</button>
+            </form>
+          </td>
+        </tr>
+        <tr id="todo-edit-{{t.id}}" class="d-none"><td colspan="4">
+          <form class="row g-2" method="post" action="{{url_for('todo_edit',tid=t.id)}}">
+            <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+            <div class="col-12 col-md-5"><input class="form-control form-control-sm" name="title" value="{{t.title}}" required></div>
+            <div class="col-6 col-md-3"><input type="date" class="form-control form-control-sm" name="due_date" value="{{t.due_date or ''}}"></div>
+            <div class="col-6 col-md-2"><select class="form-select form-select-sm" name="status"><option {% if t.status!='Done' %}selected{% endif %}>Open</option><option {% if t.status=='Done' %}selected{% endif %}>Done</option></select></div>
+            <div class="col-12 col-md-2 d-flex gap-1"><button class="btn btn-sm btn-primary" type="submit">Save</button><button class="btn btn-sm btn-outline-secondary" type="button" onclick="document.getElementById('todo-edit-{{t.id}}').classList.add('d-none')">Cancel</button></div>
+          </form>
+        </td></tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted">No to-dos yet.</td></tr>
+        {% endfor %}
+      </table>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+
+{% if can_interviews %}
+<div class="modal fade" id="createInterviewModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content modern-modal"><div class="modal-header"><div><h3>Create Interview</h3><p>Schedule a candidate conversation and meeting.</p></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><form method="post" action="{{url_for('add_interview')}}"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="next" value="dashboard"><div class="modal-body"><div class="row g-3"><div class="col-12"><label>Candidate / Application</label><select class="form-select" name="application_id" required><option value="">Select candidate</option>{% for a in applications %}<option value="{{a.id}}">{{a.candidate}} — {{a.job}}</option>{% endfor %}</select></div><div class="col-md-6"><label>Interview Round</label><input class="form-control" name="round_name" value="Round 1" placeholder="Technical Round"></div><div class="col-md-6"><label>Date &amp; Time</label><input type="datetime-local" class="form-control" name="scheduled_at" required></div><div class="col-md-6"><label>Mode</label><select class="form-select" name="mode"><option>Online</option><option>In-person</option><option>Phone</option></select></div><div class="col-md-6"><label>Interviewer</label><div class="d-flex gap-2"><select class="form-select" name="interviewer_user_id" required><option value="">Select interviewer</option>{% for x in interviewers %}<option value="{{x.id}}">{{x.name}} — {{x.email}}</option>{% endfor %}</select>{% if user.role == 'Admin' %}<a class="btn btn-outline-secondary" href="{{url_for('admin')}}" title="Create Interviewer"><i class="bi bi-person-plus"></i></a>{% endif %}</div><div class="form-text">Select the interviewer who will conduct this interview.</div></div><div class="col-md-6"><label>Meeting Provider</label><select class="form-select" name="meeting_provider">{% for p in meeting_providers %}<option>{{p}}</option>{% endfor %}</select></div><div class="col-md-6"><label>Meeting Link <span class="optional">Paste the Teams / Meet / Zoom invite link</span></label><input type="url" class="form-control" name="meeting_link" placeholder="https://teams.microsoft.com/l/meetup-join/..."></div></div></div><div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary"><i class="bi bi-calendar-plus me-1"></i>Schedule Interview</button></div></form></div></div></div>
+{% endif %}
+{% if can_apps %}
+<div class="modal fade" id="addApplicationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>New Application</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <form method="post" action="{{url_for('add_application')}}">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}"><input type="hidden" name="next" value="dashboard">
+      <div class="modal-body"><div class="row g-3">
+        <div class="col-12 col-md-6"><label class="form-label">Candidate</label><select class="form-select" name="candidate_id" required><option value="">Select candidate</option>{% for c in app_candidates %}<option value="{{c.id}}">{{c.name}}</option>{% endfor %}</select></div>
+        <div class="col-12 col-md-6"><label class="form-label">Position</label><select class="form-select" name="job_id" required><option value="">Select position</option>{% for j in open_jobs %}<option value="{{j.id}}">{{j.title}}</option>{% endfor %}</select></div>
+        <div class="col-12"><label class="form-label">Source</label><input class="form-control" name="source" placeholder="e.g. Website, Referral, LinkedIn"></div>
+      </div></div>
+      <div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>Add Application</button></div>
+    </form>
+  </div></div>
+</div>
+{% endif %}
+
+{% if can_manage_jobs %}
+<div class="modal fade" id="createPositionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-briefcase me-2 text-primary"></i>Create Position</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form class="row g-3" id="createPositionForm" method="post" action="{{url_for('add_job')}}" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div class="col-12 col-md-6"><input class="form-control" name="title" placeholder="Position name" required></div>
+          <div class="col-6 col-md-3">
+            <select class="form-select" name="company_id"><option value="">Company</option>{% for x in companies %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select>
+          </div>
+          <div class="col-6 col-md-3">
+            <input class="form-control" name="category_name" list="categoriesDatalist" placeholder="Category (type or select)" autocomplete="off">
+            <datalist id="categoriesDatalist">{% for x in categories %}<option value="{{x.name}}">{% endfor %}</datalist>
+          </div>
+          <div class="col-6 col-md-3">
+            <input class="form-control" name="location" list="locationsDatalist" placeholder="Location" autocomplete="off">
+            <datalist id="locationsDatalist">{% for x in locations %}<option value="{{x.name}}">{% endfor %}</datalist>
+          </div>
+          <div class="col-6 col-md-3">
+            <select class="form-select" name="employment_type"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option></select>
+          </div>
+          <div class="col-12 col-md-6">
+            <input class="form-control" type="file" name="jd_file" accept=".pdf,.docx,.txt">
+            <div class="form-text">Attach the JD (PDF, DOCX or TXT, max 2 MB). AI Screening uses it automatically. You can also paste the JD below, or attach it later by clicking the position.</div>
+          </div>
+          <div class="col-12"><textarea class="form-control" name="description" placeholder="Job description (optional when a JD file is attached)" rows="3"></textarea></div>
+          <div class="col-12"><textarea class="form-control" name="requirements" placeholder="Required skills, experience and qualifications" rows="3"></textarea></div>
+          <div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>Create Position</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if can_send_emails %}
+<div class="modal fade" id="emailSchedulerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-envelope-paper me-2 text-primary"></i>Status Update Email Scheduler</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+    <div class="modal-body">
+      <p class="text-muted" style="font-size:13px">Schedule a status-update email to a candidate or an interviewer for a specific application. Emails are sent automatically at the scheduled time using the email server configured for the system.</p>
+      <form method="post" action="{{url_for('schedule_status_email')}}" class="row g-3 mb-4">
+        <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+        <div class="col-12 col-md-6">
+          <label class="form-label">Application <small class="text-muted">(optional, for reference)</small></label>
+          <select class="form-select" name="application_id" onchange="const o=this.options[this.selectedIndex]; if(o.dataset.email){document.getElementById('recipEmail').value=o.dataset.email; document.getElementById('recipName').value=o.dataset.name;}">
+            <option value="">— None —</option>
+            {% for a in applications_list %}
+            <option value="{{a.id}}" data-email="{{a.candidate_email}}" data-name="{{a.candidate_name}}">{{a.candidate_name}} → {{a.job_title}}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-3"><label class="form-label">Recipient Type</label><select class="form-select" name="recipient_type"><option>Candidate</option><option>Interviewer</option></select></div>
+        <div class="col-12 col-md-3"><label class="form-label">Schedule At</label><input type="datetime-local" class="form-control" name="scheduled_at" required></div>
+        <div class="col-12 col-md-6"><label class="form-label">Recipient Name</label><input class="form-control" name="recipient_name" id="recipName" placeholder="Recipient name"></div>
+        <div class="col-12 col-md-6"><label class="form-label">Recipient Email</label><input type="email" class="form-control" name="recipient_email" id="recipEmail" placeholder="recipient@email.com" required></div>
+        <div class="col-12"><label class="form-label">Subject</label><input class="form-control" name="subject" placeholder="e.g. Update on your application status" required></div>
+        <div class="col-12"><label class="form-label">Message</label><textarea class="form-control" name="message" rows="3" placeholder="Write the status update message..." required></textarea></div>
+        <div class="col-12"><button type="submit" class="btn btn-primary"><i class="bi bi-send-clock me-1"></i>Schedule Email</button></div>
+      </form>
+      <div class="table-responsive">
+      <table class="table mb-0">
+        <tr><th>Recipient</th><th>Type</th><th>Subject</th><th>Scheduled At</th><th>Status</th><th>Actions</th></tr>
+        {% for e in scheduled_emails %}
+        <tr>
+          <td>{{e.recipient_name or '—'}}<br><small class="text-muted">{{e.recipient_email}}</small></td>
+          <td><span class="pill">{{e.recipient_type}}</span></td>
+          <td>{{e.subject}}</td>
+          <td>{{e.scheduled_at}}</td>
+          <td>
+            <span class="badge rounded-pill {% if e.status=='Sent' %}text-bg-success{% elif e.status=='Failed' %}text-bg-danger{% elif e.status=='Cancelled' %}text-bg-secondary{% else %}text-bg-warning{% endif %}">{{e.status}}</span>
+            {% if e.status=='Failed' and e.error %}<br><small class="text-danger">{{e.error[:60]}}</small>{% endif %}
+          </td>
+          <td>
+            {% if e.status=='Pending' %}
+            <form method="post" action="{{url_for('cancel_scheduled_email',eid=e.id)}}" onsubmit="return confirm('Cancel this scheduled email?');">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-circle me-1"></i>Cancel</button>
+            </form>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted">No scheduled emails yet.</td></tr>
+        {% endfor %}
+      </table>
+      </div>
+    </div>
+  </div></div>
+</div>
+{% endif %}
+
+{% if open_modal in ['batch','todos','email','position','interview','application'] %}
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  var id={'batch':'batchResumeModal','todos':'todosModal','email':'emailSchedulerModal','position':'createPositionModal','interview':'createInterviewModal','application':'addApplicationModal'}['{{open_modal}}'];
+  var el=document.getElementById(id); if(el&&window.bootstrap){bootstrap.Modal.getOrCreateInstance(el).show();}
+});
+</script>
+{% endif %}
+{% endblock %}

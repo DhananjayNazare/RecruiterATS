@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-8">
+    <div class="card">
+      <div class="card-header py-3 px-4 d-flex align-items-center justify-content-between">
+        <div>
+          <div class="fw-bold"><i class="bi bi-person-gear me-2 text-primary"></i>Edit User</div>
+          <small class="text-muted">Update the existing user account details and access role.</small>
+        </div>
+        <a href="{{url_for('admin')}}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Users</a>
+      </div>
+      <div class="card-body p-4">
+        <form method="post" class="row g-3">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Full Name</label>
+            <input class="form-control" name="name" value="{{target.name}}" required>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Email</label>
+            <input type="email" class="form-control" name="email" value="{{target.email}}" required>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Role</label>
+            <select class="form-select" name="role" id="editUserRole" onchange="document.getElementById('editCandidateWrap').style.display=(this.value==='Candidate'?'block':'none')" {% if target.id==user.id %}disabled{% endif %}>
+              {% for r in roles %}<option value="{{r}}" {% if r==target.role %}selected{% endif %}>{{r}}</option>{% endfor %}
+            </select>
+            {% if target.id==user.id %}<small class="text-muted">Your own role cannot be changed.</small>{% endif %}
+          </div>
+          {% if target.id==user.id %}<input type="hidden" name="role" value="{{target.role}}">{% endif %}
+          <div class="col-12 col-md-6" id="editCandidateWrap" style="display:{% if target.role=='Candidate' %}block{% else %}none{% endif %}">
+            <label class="form-label fw-semibold">Linked Candidate Profile</label>
+            <select class="form-select" name="candidate_id">
+              <option value="">No linked candidate</option>
+              {% for c in candidates_for_users %}<option value="{{c.id}}" {% if target.candidate_id==c.id %}selected{% endif %}>{{c.name}}{% if c.email %} — {{c.email}}{% endif %}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">New Password <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="password" class="form-control" name="password" minlength="8" placeholder="Leave blank to keep the current password" autocomplete="new-password">
+          </div>
+          <div class="col-12 d-flex gap-2 pt-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Changes</button>
+            <a href="{{url_for('admin')}}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "base.html" %}{% block content %}
+<div class="rt-ai-interview-page">
+  <div class="rt-ai-interview-head">
+    <div><div class="rt-portal-eyebrow">AI FIRST-ROUND INTERVIEW</div><h2>{{interview.job}}</h2><p>{{interview.round_name}} · Candidate: {{interview.candidate_name}} · {{interview.scheduled_at or 'Scheduled interview'}}</p></div>
+    <a href="{{url_for('candidate_panel')}}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Candidate portal</a>
+  </div>
+
+  {% if interview.status == 'Completed' %}
+    <section class="rt-ai-complete"><div class="rt-ai-complete-icon"><i class="bi bi-check-lg"></i></div><h3>Interview submitted</h3><p>Your AI first-round interview has been submitted to the recruiter with your saved answers and a detailed report. Your next-step status will appear in your Candidate Portal.</p><a class="btn btn-primary" href="{{url_for('candidate_panel')}}">Return to Candidate Portal</a></section>
+  {% elif not questions %}
+    <section class="rt-ai-start-card">
+      <div class="rt-ai-start-icon"><i class="bi bi-stars"></i></div><h3>Ready for your AI interview?</h3>
+      <p>The AI will prepare 40 role-specific questions using the job description and your resume. You can answer each question by typing or using voice-to-text. The interview is saved as you go.</p>
+      <div class="rt-ai-info-grid"><div><i class="bi bi-list-ol"></i><b>40 questions</b><span>Role-specific technical, practical and behavioral topics</span></div><div><i class="bi bi-mic"></i><b>Voice or typing</b><span>Use supported browser voice-to-text or type an answer</span></div><div><i class="bi bi-camera-video"></i><b>Camera signals</b><span>Optional browser-side gaze/head movement estimates with visible consent</span></div></div>
+      <div class="rt-ai-consent-note"><b>Camera tracking notice</b><p class="mb-0">If enabled, camera video is processed in your browser. The app stores only approximate counts such as face-not-detected, look-away and head-movement samples—not the video. These signals do not determine your score and are not proof of honesty or ability.</p></div>
+      <form method="post" action="{{url_for('candidate_ai_interview_start',iid=interview.id)}}" class="rt-ai-start-form">
+        <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+        <label class="form-check rt-ai-consent-check"><input class="form-check-input" type="checkbox" name="camera_consent" value="yes" required><span>I have read the interview and camera-tracking notice. I understand camera permission can be denied; if tracking is unavailable, the app will indicate that.</span></label>
+        <button class="btn btn-primary btn-lg" type="submit"><i class="bi bi-play-circle me-2"></i>Generate questions and begin interview</button>
+      </form>
+    </section>
+  {% else %}
+    <div class="rt-ai-session-layout">
+      <section class="rt-ai-paper-column">
+        <div class="rt-ai-progress-card"><div class="d-flex justify-content-between align-items-center gap-2"><span class="rt-ai-live-pill"><span></span> AI interviewer</span><span class="rt-ai-question-count" id="questionCount">Question 1 of {{questions|length}}</span></div><div class="progress mt-3"><div class="progress-bar" id="questionProgress" style="width:2.5%"></div></div><div class="d-flex justify-content-between mt-2"><span class="rt-portal-muted" id="answeredCount">0 of {{questions|length}} answered</span><span class="rt-portal-muted">Your answers auto-save</span></div></div>
+        <article class="rt-ai-question-paper"><div class="rt-ai-paper-label"><span id="questionNumberLabel">QUESTION 01</span><span class="badge" id="questionTypeLabel">Role-specific</span></div><div class="rt-ai-paper-rule"></div><div class="rt-ai-competency" id="questionCompetency">Role competency</div><h3 id="questionText">{{questions[0].question}}</h3><label for="candidateAnswer" class="form-label mt-4">Your answer</label><textarea class="form-control rt-ai-answer-box" id="candidateAnswer" rows="8" maxlength="5000" placeholder="Type your answer here, or use the voice button to dictate an answer..."></textarea><div class="rt-ai-answer-tools"><button type="button" id="voiceAnswerBtn" class="btn btn-outline-secondary"><i class="bi bi-mic me-1"></i>Answer by voice</button><span id="voiceState" class="rt-portal-muted" aria-live="polite">Voice-to-text is available in supported browsers.</span><span id="saveState" class="rt-ai-save-state" aria-live="polite"><i class="bi bi-cloud-check me-1"></i>Saved</span></div></article>
+        <div class="rt-ai-question-nav"><button type="button" class="btn btn-outline-secondary" id="previousQuestion"><i class="bi bi-arrow-left me-1"></i>Previous</button><div class="rt-ai-nav-right"><button type="button" class="btn btn-outline-primary" id="saveNextQuestion">Save &amp; next <i class="bi bi-arrow-right ms-1"></i></button><button type="button" class="btn btn-primary" id="submitInterview"><i class="bi bi-send-check me-1"></i>Submit to recruiter</button></div></div>
+        <div class="rt-ai-footer-note"><i class="bi bi-shield-check me-1"></i>Stay on this page while answering. Your text responses are saved after each question. Your video is not recorded or uploaded.</div>
+      </section>
+      <aside class="rt-ai-monitor-column">
+        <section class="rt-ai-monitor-card"><div class="rt-ai-monitor-head"><div><b><i class="bi bi-camera-video me-2"></i>Camera attention signals</b><span>Approximate, browser-side tracking</span></div><span class="badge" id="cameraStatus">Not started</span></div><div class="rt-ai-video-wrap"><video id="candidateCamera" autoplay muted playsinline></video><div id="cameraPlaceholder" class="rt-ai-camera-placeholder"><i class="bi bi-camera-video-off"></i><b>Camera is off</b><span>Enable it to collect approximate face, eye-gaze and head movement signals.</span></div></div><button type="button" class="btn btn-outline-secondary w-100 mt-3" id="enableCamera"><i class="bi bi-camera-video me-1"></i>Enable camera tracking</button><p class="rt-portal-muted small mt-2 mb-0" id="cameraMessage">Your permission is required. Tracking may be limited by lighting, glasses, browser support or device performance.</p><div class="rt-ai-metrics"><div><span>Face missing</span><b id="faceMissingCount">0</b></div><div><span>Look-away estimate</span><b id="lookAwayCount">0</b></div><div><span>Head movement</span><b id="headMovementCount">0</b></div><div><span>Samples</span><b id="sampleCount">0</b></div></div></section>
+        <section class="rt-ai-help-card"><h4><i class="bi bi-lightbulb me-2"></i>Interview tips</h4><ul><li>Answer in your own words and use specific examples.</li><li>For technical questions, explain your approach step by step.</li><li>You can move between questions; saved answers will remain.</li><li>Submit only when you are ready. The recruiter receives the report after submission.</li></ul></section>
+      </aside>
+    </div>
+  {% endif %}
+</div>
+{% if questions and interview.status != 'Completed' %}
+<script>
+const aiQuestions = {{ questions|tojson }};
+const savedAnswerMap = {{ answers|tojson }};
+const csrfToken = {{ csrf_token|tojson }};
+const interviewAnswerUrl = {{ url_for('candidate_ai_interview_answer',iid=interview.id)|tojson }};
+const interviewSubmitUrl = {{ url_for('candidate_ai_interview_submit',iid=interview.id)|tojson }};
+const redirectAfterSubmit = {{ url_for('candidate_panel')|tojson }};
+let activeQuestion = 0;
+let answerMode = 'typed';
+let recognition = null;
+let cameraStream = null;
+let faceLandmarker = null;
+let trackingRunning = false;
+let lastVideoTime = -1;
+let lastCenter = null;
+let lastTrackAt = 0;
+let lastMovementCountAt = 0;
+let cameraStartedAt = 0;
+const tracking = {face_missing:0,look_away:0,head_movement:0,samples:0,camera_seconds:0};
+const questionText = document.getElementById('questionText');
+const answerBox = document.getElementById('candidateAnswer');
+const safeText = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+function currentSaved(){return savedAnswerMap[String(activeQuestion)] || {};}
+function setSavedBadge(text, bad=false){const el=document.getElementById('saveState');el.innerHTML=(bad?'<i class="bi bi-exclamation-circle me-1"></i>':'<i class="bi bi-cloud-check me-1"></i>')+safeText(text);el.classList.toggle('is-error',bad);}
+function answeredCount(){return Object.values(savedAnswerMap).filter(x=>String(x.answer||'').trim()).length;}
+function updateMetrics(){document.getElementById('faceMissingCount').textContent=tracking.face_missing;document.getElementById('lookAwayCount').textContent=tracking.look_away;document.getElementById('headMovementCount').textContent=tracking.head_movement;document.getElementById('sampleCount').textContent=tracking.samples;}
+function renderQuestion(){
+  const q=aiQuestions[activeQuestion] || {};
+  document.getElementById('questionCount').textContent=`Question ${activeQuestion+1} of ${aiQuestions.length}`;
+  document.getElementById('questionNumberLabel').textContent=`QUESTION ${String(activeQuestion+1).padStart(2,'0')}`;
+  document.getElementById('questionTypeLabel').textContent=q.type||'Role-specific';
+  document.getElementById('questionCompetency').textContent=q.competency||'Role competency';
+  questionText.textContent=q.question||'Question not available.';
+  answerBox.value=currentSaved().answer||'';
+  answerMode=currentSaved().answer_mode||'typed';
+  document.getElementById('previousQuestion').disabled=activeQuestion===0;
+  document.getElementById('saveNextQuestion').innerHTML=activeQuestion===aiQuestions.length-1?'Save final answer <i class="bi bi-check2 ms-1"></i>':'Save &amp; next <i class="bi bi-arrow-right ms-1"></i>';
+  document.getElementById('questionProgress').style.width=`${Math.round((activeQuestion+1)/aiQuestions.length*100)}%`;
+  document.getElementById('answeredCount').textContent=`${answeredCount()} of ${aiQuestions.length} answered`;
+  setSavedBadge(currentSaved().saved_at?'Saved':'Not saved yet');
+}
+async function saveCurrent(){
+  setSavedBadge('Saving…');
+  const payload={question_index:activeQuestion,answer:answerBox.value,answer_mode:answerMode};
+  const current={question:aiQuestions[activeQuestion].question,answer:answerBox.value,answer_mode:answerMode,saved_at:new Date().toISOString()};
+  try{
+    const response=await fetch(interviewAnswerUrl,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken},body:JSON.stringify(payload)});
+    const data=await response.json();
+    if(!response.ok||!data.ok)throw new Error(data.error||'Save failed');
+    savedAnswerMap[String(activeQuestion)]=current;
+    document.getElementById('answeredCount').textContent=`${data.answered} of ${aiQuestions.length} answered`;
+    setSavedBadge('Saved');return true;
+  }catch(e){setSavedBadge('Save failed',true);document.getElementById('cameraMessage').textContent='Your answer may not have saved: '+e.message;return false;}
+}
+document.getElementById('previousQuestion').addEventListener('click',async()=>{if(await saveCurrent()){activeQuestion=Math.max(0,activeQuestion-1);renderQuestion();}});
+document.getElementById('saveNextQuestion').addEventListener('click',async()=>{if(await saveCurrent()){activeQuestion=Math.min(aiQuestions.length-1,activeQuestion+1);renderQuestion();}});
+answerBox.addEventListener('input',()=>setSavedBadge('Unsaved changes'));
+answerBox.addEventListener('blur',()=>{if(answerBox.value!==String(currentSaved().answer||''))saveCurrent();});
+const SpeechAPI=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SpeechAPI){document.getElementById('voiceAnswerBtn').addEventListener('click',()=>{document.getElementById('voiceState').textContent='Voice-to-text is not supported by this browser. Please type your answer.';});}
+else{
+  document.getElementById('voiceAnswerBtn').addEventListener('click',()=>{
+    if(recognition){try{recognition.stop();}catch(e){}recognition=null;document.getElementById('voiceAnswerBtn').innerHTML='<i class="bi bi-mic me-1"></i>Answer by voice';return;}
+    recognition=new SpeechAPI();recognition.lang='en-IN';recognition.interimResults=true;recognition.continuous=false;
+    document.getElementById('voiceState').textContent='Listening… speak clearly, then pause.';document.getElementById('voiceAnswerBtn').innerHTML='<i class="bi bi-stop-circle me-1"></i>Stop voice';
+    recognition.onresult=event=>{let finalText='';for(let i=event.resultIndex;i<event.results.length;i++){if(event.results[i].isFinal)finalText+=event.results[i][0].transcript+' ';}if(finalText){const old=answerBox.value.trim();answerBox.value=(old?old+' ':'')+finalText.trim();answerMode='voice';setSavedBadge('Unsaved changes');}};
+    recognition.onerror=()=>document.getElementById('voiceState').textContent='Microphone transcription failed. You can type your answer instead.';
+    recognition.onend=()=>{document.getElementById('voiceState').textContent='Voice transcription stopped.';document.getElementById('voiceAnswerBtn').innerHTML='<i class="bi bi-mic me-1"></i>Answer by voice';recognition=null;};
+    try{recognition.start();}catch(e){document.getElementById('voiceState').textContent='Could not start voice input. Please retry or type.';recognition=null;}
+  });
+}
+function stopCamera(){trackingRunning=false;if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;}const video=document.getElementById('candidateCamera');video.srcObject=null;}
+async function enableCamera(){
+  const button=document.getElementById('enableCamera');button.disabled=true;button.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Starting tracking…';
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('Camera access requires HTTPS or localhost and a supported browser.');
+    cameraStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}},audio:false});
+    const video=document.getElementById('candidateCamera');video.srcObject=cameraStream;await video.play();document.getElementById('cameraPlaceholder').classList.add('is-hidden');
+    document.getElementById('cameraStatus').textContent='Camera on';document.getElementById('cameraMessage').textContent='Camera video is processed locally in this browser. Only approximate counts are submitted with the report.';
+    cameraStartedAt=Date.now();
+    const visionModule=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+    const vision=await visionModule.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    const modelPath='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+    try{faceLandmarker=await visionModule.FaceLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:modelPath,delegate:'GPU'},runningMode:'VIDEO',numFaces:1});}
+    catch(gpuError){faceLandmarker=await visionModule.FaceLandmarker.createFromOptions(vision,{baseOptions:{modelAssetPath:modelPath,delegate:'CPU'},runningMode:'VIDEO',numFaces:1});}
+    trackingRunning=true;button.innerHTML='<i class="bi bi-camera-video me-1"></i>Camera tracking enabled';document.getElementById('cameraStatus').textContent='Tracking';trackFrame();
+  }catch(error){
+    if(cameraStream){cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;}
+    cameraStartedAt=0;
+    document.getElementById('cameraStatus').textContent='Unavailable';document.getElementById('cameraMessage').textContent='Camera tracking could not start: '+(error.message||'permission or model loading failed')+'. You can continue the interview; this limitation will be visible to the recruiter.';
+    button.disabled=false;button.innerHTML='<i class="bi bi-arrow-clockwise me-1"></i>Retry camera tracking';
+  }
+}
+document.getElementById('enableCamera').addEventListener('click',enableCamera);
+function trackFrame(){
+  if(!trackingRunning)return;
+  const video=document.getElementById('candidateCamera');const now=performance.now();
+  if(video.readyState>=2&&video.currentTime!==lastVideoTime&&now-lastTrackAt>350){
+    lastVideoTime=video.currentTime;lastTrackAt=now;tracking.samples++;
+    try{
+      const result=faceLandmarker.detectForVideo(video,now);const lm=result.faceLandmarks&&result.faceLandmarks[0];
+      if(!lm){tracking.face_missing++;}
+      else{
+        const nose=lm[1]||lm[4];const center={x:nose.x,y:nose.y};
+        if(lastCenter&&now-lastMovementCountAt>900&&(Math.abs(center.x-lastCenter.x)>.075||Math.abs(center.y-lastCenter.y)>.075)){tracking.head_movement++;lastMovementCountAt=now;}
+        lastCenter=center;
+        const ratio=(iris,a,b)=>{const lo=Math.min(lm[a].x,lm[b].x),hi=Math.max(lm[a].x,lm[b].x);return hi>lo?(lm[iris].x-lo)/(hi-lo):.5;};
+        if(lm[468]&&lm[473]&&lm[33]&&lm[133]&&lm[362]&&lm[263]){const gaze=(ratio(468,33,133)+ratio(473,362,263))/2;if(gaze<.23||gaze>.77)tracking.look_away++;}
+      }
+      if(cameraStartedAt)tracking.camera_seconds=Math.max(tracking.camera_seconds,Math.floor((Date.now()-cameraStartedAt)/1000));
+      updateMetrics();
+    }catch(e){document.getElementById('cameraMessage').textContent='Tracking is running with limited landmark readings; continue answering normally.';}
+  }
+  requestAnimationFrame(trackFrame);
+}
+document.getElementById('submitInterview').addEventListener('click',async()=>{
+  if(!confirm('Submit your saved answers to the recruiter and generate your interview report? You cannot edit answers after submission.'))return;
+  if(!(await saveCurrent())){alert('Your current answer could not be saved. Check your connection and try again.');return;}
+  const btn=document.getElementById('submitInterview');btn.disabled=true;btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Generating report…';
+  if(cameraStartedAt)tracking.camera_seconds=Math.max(tracking.camera_seconds,Math.floor((Date.now()-cameraStartedAt)/1000));
+  tracking.enabled=tracking.samples>0;
+  try{
+    const r=await fetch(interviewSubmitUrl,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrfToken},body:JSON.stringify({tracking})});
+    const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Submission failed');stopCamera();window.location=d.redirect||redirectAfterSubmit;
+  }catch(e){btn.disabled=false;btn.innerHTML='<i class="bi bi-send-check me-1"></i>Retry report submission';alert(e.message+' Your answers remain saved.');}
+});
+window.addEventListener('beforeunload',()=>{if(recognition){try{recognition.stop();}catch(e){}}stopCamera();});
+renderQuestion();updateMetrics();
+</script>
+{% endif %}
+{% endblock %}

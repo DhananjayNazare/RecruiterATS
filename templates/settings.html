@@ -1,0 +1,206 @@
+{% extends "base.html" %}{% block content %}
+<div class="page-wrap">
+<div class="card mb-3" id="twofa">
+  <div class="card-header py-3 px-4"><i class="bi bi-shield-lock me-2 text-primary"></i>Two-Factor Authentication</div>
+  <div class="card-body p-4">
+    {% if not totp_available %}
+    <div class="alert alert-warning mb-0">Two-factor authentication requires the <code>pyotp</code> and <code>qrcode</code> packages on the server. Install them (see requirements.txt) and restart the app to enable this.</div>
+    {% elif totp_enabled %}
+    <div class="d-flex align-items-center gap-2 mb-3"><span class="badge text-bg-success"><i class="bi bi-check-circle me-1"></i>Enabled</span><span class="text-muted small">Your account requires an authenticator code at every sign-in.</span></div>
+    {% if totp_required %}
+    <div class="alert alert-info py-2 mb-0" style="font-size:13px"><i class="bi bi-info-circle me-1"></i>Your administrator requires two-factor authentication on this account. Contact an administrator if you need it disabled.</div>
+    {% else %}
+    <form method="post" action="{{url_for('twofa_disable')}}" class="row g-2 align-items-end" style="max-width:420px" onsubmit="return confirm('Turn off two-factor authentication for your account?');">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <div class="col-8"><label class="form-label small">Confirm your password to disable</label><input type="password" class="form-control" name="password" required></div>
+      <div class="col-4"><button class="btn btn-outline-danger w-100" type="submit">Disable</button></div>
+    </form>
+    {% endif %}
+    {% elif session.pending_totp_secret %}
+    <p class="text-muted" style="font-size:13px">Scan this QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.), then enter the 6-digit code it shows to confirm setup.</p>
+    <div class="d-flex gap-4 flex-wrap align-items-start">
+      <img src="{{url_for('twofa_qrcode')}}" alt="2FA QR code" width="180" height="180" class="border rounded p-1 bg-white">
+      <div class="flex-grow-1" style="min-width:240px">
+        <div class="small text-muted mb-1">Can't scan? Enter this key manually:</div>
+        <code class="d-block mb-3 user-select-all">{{session.pending_totp_secret}}</code>
+        <form method="post" action="{{url_for('twofa_confirm')}}" class="row g-2 align-items-end">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div class="col-6"><label class="form-label small">6-digit code</label><input class="form-control" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required autofocus></div>
+          <div class="col-6 d-flex gap-2">
+            <button class="btn btn-primary flex-grow-1" type="submit">Confirm &amp; Enable</button>
+          </div>
+        </form>
+        <form method="post" action="{{url_for('twofa_cancel_setup')}}" class="mt-2">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <button class="btn btn-sm btn-link text-muted p-0" type="submit">Cancel setup</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="d-flex align-items-center gap-2 mb-3"><span class="badge text-bg-secondary">Not enabled</span><span class="text-muted small">Add an authenticator-app code as a second step at sign-in.</span></div>
+    {% if totp_required %}<div class="alert alert-warning py-2" style="font-size:13px"><i class="bi bi-exclamation-triangle me-1"></i>Your administrator requires two-factor authentication on this account.</div>{% endif %}
+    <form method="post" action="{{url_for('twofa_setup')}}">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <button class="btn btn-primary" type="submit"><i class="bi bi-shield-plus me-1"></i>Set up two-factor authentication</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% if show_smtp %}
+<div class="card mb-3">
+  <div class="card-header py-3 px-4"><i class="bi bi-envelope-at me-2 text-primary"></i>SMTP / Email Server</div>
+  <div class="card-body p-4">
+    <p class="text-muted" style="font-size:13px">Used to send interview reminders, notifications and test emails from the ATS. Your password is stored securely and never re-displayed.</p>
+    <form method="post" class="row g-3 mb-3">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <input type="hidden" name="form_type" value="smtp">
+      <div class="col-12 col-md-8">
+        <label class="form-label">SMTP Host</label>
+        <input class="form-control" name="smtp_host" value="{{smtp_host}}" placeholder="smtp.gmail.com">
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Port</label>
+        <input class="form-control" name="smtp_port" value="{{smtp_port}}" placeholder="587">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Username</label>
+        <input class="form-control" name="smtp_username" value="{{smtp_username}}" placeholder="you@company.com">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Password{% if smtp_password_set %} <small class="text-muted">(saved — leave blank to keep)</small>{% endif %}</label>
+        <input type="password" class="form-control" name="smtp_password" placeholder="{% if smtp_password_set %}••••••••{% else %}App password / SMTP password{% endif %}">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">From Email</label>
+        <input type="email" class="form-control" name="smtp_from_email" value="{{smtp_from_email}}" placeholder="noreply@company.com">
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">From Name</label>
+        <input class="form-control" name="smtp_from_name" value="{{smtp_from_name}}" placeholder="RecruiterATS">
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label">Encryption</label>
+        <select class="form-select" name="smtp_use_tls">
+          <option value="1" {% if smtp_use_tls %}selected{% endif %}>STARTTLS</option>
+          <option value="0" {% if not smtp_use_tls %}selected{% endif %}>None</option>
+        </select>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save SMTP Settings</button>
+      </div>
+    </form>
+    <form method="post" action="{{url_for('smtp_test')}}">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <button type="submit" class="btn btn-outline-primary"><i class="bi bi-send me-1"></i>Send Test Email</button>
+    </form>
+  </div>
+</div>
+
+{% endif %}
+{% if is_admin %}
+<div class="card mb-3">
+  <div class="card-header py-3 px-4"><i class="bi bi-robot me-2 text-primary"></i>AI Auto-Screening &amp; Interview Scheduling</div>
+  <div class="card-body p-4">
+    <p class="text-muted" style="font-size:13px">When AI screening scores a candidate at or above the threshold, the app checks the interview calendar, books the first free slot, creates the meeting link and emails the candidate (and interviewer) through the email scheduler.</p>
+    <form method="post" class="row g-3">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <input type="hidden" name="form_type" value="ai_auto">
+      <div class="col-6 col-md-3"><label class="form-label">Auto-interview threshold (%)</label><input type="number" min="1" max="100" class="form-control" name="ai_auto_threshold" value="{{ai_auto.threshold}}"></div>
+      <div class="col-12 col-md-4 d-flex align-items-end"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="sched_enabled" value="1" id="schedEnabled" {% if ai_auto.enabled %}checked{% endif %}><label class="form-check-label" for="schedEnabled">Auto-schedule interviews</label></div></div>
+      <div class="col-12 col-md-5 d-flex align-items-end"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="sched_notify_interviewer" value="1" id="schedNotify" {% if ai_auto.notify_interviewer %}checked{% endif %}><label class="form-check-label" for="schedNotify">Also email the interviewer</label></div></div>
+      <div class="col-12"><label class="form-label d-block">Working days</label>
+        {% for n,label in [(0,'Mon'),(1,'Tue'),(2,'Wed'),(3,'Thu'),(4,'Fri'),(5,'Sat'),(6,'Sun')] %}
+        <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="sched_days" value="{{n}}" id="schedDay{{n}}" {% if n in ai_auto.days %}checked{% endif %}><label class="form-check-label" for="schedDay{{n}}">{{label}}</label></div>
+        {% endfor %}
+      </div>
+      <div class="col-6 col-md-2"><label class="form-label">Day starts</label><input type="time" class="form-control" name="sched_start" value="{{ai_auto.start}}"></div>
+      <div class="col-6 col-md-2"><label class="form-label">Day ends</label><input type="time" class="form-control" name="sched_end" value="{{ai_auto.end}}"></div>
+      <div class="col-6 col-md-2"><label class="form-label">Length (min)</label><input type="number" min="15" max="240" class="form-control" name="sched_duration" value="{{ai_auto.duration}}"></div>
+      <div class="col-6 col-md-2"><label class="form-label">Gap between (min)</label><input type="number" min="0" max="120" class="form-control" name="sched_buffer" value="{{ai_auto.buffer}}"></div>
+      <div class="col-6 col-md-2"><label class="form-label">Min notice (hours)</label><input type="number" min="0" max="168" class="form-control" name="sched_lead_hours" value="{{ai_auto.lead_hours}}"></div>
+      <div class="col-6 col-md-2"><label class="form-label">Look ahead (days)</label><input type="number" min="1" max="60" class="form-control" name="sched_horizon_days" value="{{ai_auto.horizon}}"></div>
+      <div class="col-12 col-md-4"><label class="form-label">Interview round name</label><input class="form-control" name="sched_round" value="{{ai_auto.round}}"></div>
+      <div class="col-12 col-md-4"><label class="form-label">Meeting provider</label>
+        <select class="form-select" name="sched_provider">{% for pr in meeting_providers %}<option {% if ai_auto.provider==pr %}selected{% endif %}>{{pr}}</option>{% endfor %}</select>
+        </div>
+      <div class="col-12 col-md-4"><label class="form-label">Default meeting link <span class="text-muted">(optional)</span></label><input type="url" class="form-control" name="sched_meeting_link" value="{{ai_auto.meeting_link}}" placeholder="https://teams.microsoft.com/... or https://meet.google.com/..."><div class="form-text">Teams / Meet / Zoom can't be created automatically here, so this link (e.g. your permanent meeting room) is put in auto-scheduled interviews and emails. Leave empty to add the link per interview.</div></div>
+      <div class="col-12 col-md-4"><label class="form-label">Public app URL <span class="text-muted">(for meeting links in emails)</span></label><input class="form-control" name="public_base_url" value="{{ai_auto.base_url}}" placeholder="https://ats.yourcompany.com"></div>
+      <div class="col-12"><button type="submit" class="btn btn-primary">Save AI Auto-Screening Settings</button></div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% if is_admin %}
+<div class="card mb-3">
+  <div class="card-header py-3 px-4"><i class="bi bi-toggles me-2 text-primary"></i>AI On / Off</div>
+  <div class="card-body p-4">
+    <p class="text-muted mb-3" style="font-size:13px">Choose, task by task, whether AI decides on its own or leaves the decision to the recruiter. The same buttons are in the top bar (AI ON/OFF).</p>
+    {% include '_ai_switches.html' %}
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header py-3 px-4"><i class="bi bi-cloud-arrow-up me-2 text-primary"></i>Automatic Backup</div>
+  <div class="card-body p-4">
+    <p class="text-muted" style="font-size:13px">Automatically backs up the ATS database and uploaded resumes into a ZIP file. Keep a copy on a separate disk or network location for stronger disaster recovery.</p>
+    <form method="post" class="row g-3 mb-3">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <div class="col-12 col-md-6">
+        <label class="form-label">Enable automatic backup</label>
+        <select class="form-select" name="backup_enabled">
+          <option value="1" {% if backup_enabled %}selected{% endif %}>Enabled</option>
+          <option value="0" {% if not backup_enabled %}selected{% endif %}>Disabled</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Frequency</label>
+        <select class="form-select" name="backup_frequency">
+          <option {% if backup_frequency=='Daily' %}selected{% endif %}>Daily</option>
+          <option {% if backup_frequency=='Weekly' %}selected{% endif %}>Weekly</option>
+          <option {% if backup_frequency=='Hourly' %}selected{% endif %}>Hourly</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Backup time</label>
+        <input type="time" class="form-control" name="backup_time" value="{{backup_time}}">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Keep last backups</label>
+        <input type="number" min="1" max="3650" class="form-control" name="backup_retention" value="{{backup_retention}}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Backup directory</label>
+        <input class="form-control" name="backup_directory" value="{{backup_directory}}" placeholder="Default: application/backups">
+      </div>
+      <div class="col-12"><button type="submit" class="btn btn-primary">Save Backup Settings</button></div>
+    </form>
+
+    <dl class="kv row mb-3">
+      <dt class="col-5 col-md-3">Last successful backup</dt><dd class="col-7 col-md-9">{{backup_last or 'Never'}}</dd>
+      <dt class="col-5 col-md-3">Last error</dt><dd class="col-7 col-md-9">{{backup_error or 'None'}}</dd>
+    </dl>
+
+    {% if user.role=='Admin' %}
+    <form method="post" action="{{url_for('backup_now')}}">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <button type="submit" class="btn btn-outline-primary"><i class="bi bi-cloud-arrow-up me-1"></i>Create Backup Now</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% if user.role == 'Admin' %}
+<div class="card mt-3"><div class="card-header py-3 px-4"><i class="bi bi-database-add me-2 text-primary"></i>Demo data</div>
+  <div class="card-body p-3">
+    <p class="small text-muted mb-3">Fill the app with sample candidates, positions, applications and interviews (e-mails end with @demo.example). Loading again replaces the earlier demo set. Your real data is not touched.</p>
+    <form method="post" action="{{url_for('demo_data')}}" class="d-flex flex-wrap gap-2 align-items-center">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <input class="form-control" style="width:110px" type="number" name="count" min="1" max="5000" value="1000" aria-label="Number of demo candidates">
+      <button class="btn btn-primary" name="action" value="load" type="submit"><i class="bi bi-people me-1"></i>Load demo candidates</button>
+      <button class="btn btn-outline-danger" name="action" value="remove" type="submit" onclick="return confirm('Remove all demo candidates?');">Remove demo data</button>
+    </form>
+  </div></div>
+{% endif %}
+</div>
+{% endblock %}

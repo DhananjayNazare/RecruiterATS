@@ -1,0 +1,13 @@
+{# Small AI ON/OFF buttons. Used in the top bar and in Settings. #}
+{% set _can = can_manage_candidates %}
+<div class="ai-switch-list">
+  {% for key,label,hint in [
+     ('ai_master','AI assistant','OFF = recruiter decides everything; AI still analyses when you click an AI button'),
+     ('ai_decide_status','AI decides candidate status','ON = AI sets Accepted / Shortlisted / Hold / Rejected from the score. OFF = AI only suggests, you choose'),
+     ('ai_auto_schedule','AI books interview &amp; emails candidate','ON = AI books a free slot and emails the candidate. OFF = you schedule it yourself') ] %}
+  <label class="ai-switch-row">
+    <span class="ai-switch-text"><b>{{label|safe}}</b><small>{{hint|safe}}</small></span>
+    <span class="ai-toggle"><input type="checkbox" class="ai-switch" data-ai-key="{{key}}" {% if ai_switch[key] %}checked{% endif %} {% if not _can %}disabled{% endif %}><i></i></span>
+  </label>
+  {% endfor %}
+</div>

@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block auth %}
+<div class="rt-auth">
+  <section class="rt-auth-hero">
+    <div class="rt-auth-brand"><span class="rt-brandmark"><i class="bi bi-people-fill"></i></span><span class="rt-brand-text">Recruiter<b>ATS</b></span></div>
+    <div class="rt-auth-hero-body">
+      <h1>Smarter Hiring<br>Better Teams</h1>
+      <p>Find <i></i> Screen <i></i> Hire</p>
+      <div class="rt-auth-art" aria-hidden="true">
+        <div class="rt-art-card c1"><span class="rt-art-avatar"></span><div><b></b><em></em></div></div>
+        <div class="rt-art-card c2"><span class="rt-art-avatar a2"></span><div><b></b><em></em></div></div>
+        <div class="rt-art-screen"><i class="bi bi-person-check-fill"></i></div>
+      </div>
+    </div>
+    <ul class="rt-auth-features">
+      <li><i class="bi bi-cpu"></i><span>AI Powered<br>Screening</span></li>
+      <li><i class="bi bi-calendar2-check"></i><span>Manage<br>Interviews</span></li>
+      <li><i class="bi bi-people"></i><span>Team<br>Collaboration</span></li>
+    </ul>
+  </section>
+  <section class="rt-auth-panel">
+    <div class="rt-auth-form">
+      <h2>Welcome Back</h2>
+      <p class="rt-auth-sub">Sign in to your RecruiterATS account</p>
+      {% with messages=get_flashed_messages(with_categories=true) %}
+        {% for cat,msg in messages %}
+        <div class="alert alert-{{ 'danger' if cat=='danger' else 'success' }} py-2">{{msg}}</div>
+        {% endfor %}
+      {% endwith %}
+      <form method="post">
+        <label class="form-label">Email or Username</label>
+        <div class="rt-input"><i class="bi bi-person"></i><input type="email" class="form-control" name="email" placeholder="Enter your email or username" required autofocus></div>
+        <label class="form-label">Password</label>
+        <div class="rt-input"><i class="bi bi-lock"></i><input type="password" class="form-control" id="loginPassword" name="password" placeholder="Enter your password" required><button type="button" class="rt-eye" onclick="var i=document.getElementById('loginPassword');i.type=i.type==='password'?'text':'password'" aria-label="Show password"><i class="bi bi-eye"></i></button></div>
+        <div class="d-flex justify-content-end mb-3"><a href="{{url_for('forgot_password')}}" class="small">Forgot password?</a></div>
+        <button class="btn btn-primary w-100">Login</button>
+      </form>
+      <p class="rt-auth-foot">Don't have an account? <a href="{{url_for('signup')}}">Create an account</a></p>
+    </div>
+    <div class="rt-auth-copy">© 2026 RecruiterATS. All rights reserved.</div>
+  </section>
+</div>
+{% endblock %}

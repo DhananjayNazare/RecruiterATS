@@ -1,0 +1,60 @@
+{% extends "base.html" %}{% block content %}
+<div class="card mb-3">
+  <div class="card-header py-3 px-4">New Application</div>
+  <div class="card-body p-4">
+    <form class="row g-3" method="post" action="{{url_for('add_application')}}">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <div class="col-12 col-md-4">
+        <select class="form-select" name="candidate_id" required><option value="">Candidate</option>{% for c in candidates %}<option value="{{c.id}}">{{c.name}}</option>{% endfor %}</select>
+      </div>
+      <div class="col-12 col-md-4">
+        <select class="form-select" name="job_id" required><option value="">Position</option>{% for j in jobs %}<option value="{{j.id}}">{{j.title}}</option>{% endfor %}</select>
+      </div>
+      <div class="col-12 col-md-3"><input class="form-control" name="source" placeholder="Source"></div>
+      <div class="col-12 col-md-1"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header py-3 px-4">Application Pipeline</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <tr><th class="ps-4">Candidate</th><th>Position</th><th>Status</th><th>AI Score</th><th>AI Screening</th><th class="pe-4">Actions</th></tr>
+      {% for a in applications %}
+      <tr>
+        <td class="ps-4">{{a.candidate}}</td>
+        <td>{{a.job}}{% if a.ai_interview_status %}<div class="small text-muted mt-1">AI first round: {{a.ai_interview_status}}</div>{% endif %}</td>
+        <td>
+          <form method="post" action="{{url_for('update_status',aid=a.id)}}">
+            <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+            <select class="form-select form-select-sm" style="min-width:130px" name="status" onchange="this.form.submit()">
+              {% for s in ['Applied','Screening','Accepted','Hold','Shortlisted','Interview','Offer','Hired','Rejected'] %}
+              <option {% if a.status==s %}selected{% endif %}>{{s}}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td><b>{{a.match_score or '—'}}</b>{% if a.ai_suggestion %}<div class="small text-muted">AI suggests: {{a.ai_suggestion}}</div>{% endif %}</td>
+        <td>
+          <form method="post" action="{{url_for('ai_screen',aid=a.id)}}" class="ajax-form">
+            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-stars me-1"></i>Run AI Screen</button>
+          </form>
+        </td>
+        <td class="pe-4">
+          {% if a.ai_interview_report %}<a class="btn btn-sm btn-outline-primary mb-1" href="{{url_for('ai_interview_report',aid=a.id)}}"><i class="bi bi-file-earmark-bar-graph me-1"></i>AI Report</a>{% endif %}
+          <form method="post" action="{{url_for('delete_application',aid=a.id)}}" onsubmit="return confirm('Remove this application? Related interviews will also be removed.');">
+            <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="text-muted ps-4">No applications.</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

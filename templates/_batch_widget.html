@@ -1,0 +1,31 @@
+{# Reusable resume drop-zone. Set bw_id (unique), positions, selected_position and batch_threshold before including. #}
+<div class="batch-widget" id="{{bw_id}}" data-threshold="{{batch_threshold}}">
+  <form class="bw-form" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+    <div class="row g-3 align-items-end mb-3">
+      <div class="col-12 col-md-7">
+        <label class="form-label fw-semibold small mb-1">Position (JD to screen against)</label>
+        <select class="form-select bw-position">
+          <option value="">— No position: upload only, no AI screening —</option>
+          {% for j in positions %}<option value="{{j.id}}" {% if selected_position==j.id %}selected{% endif %}>{{j.title}}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-5 small text-muted">
+        With a position selected, every resume is parsed, scored against that JD and—at or above the threshold—an interview is scheduled and the candidate is emailed automatically.
+      </div>
+    </div>
+    <input class="bw-input" type="file" accept=".pdf,.docx,.txt" multiple hidden>
+    <div class="bw-drop batch-resume-dropzone" tabindex="0">
+      <i class="bi bi-cloud-arrow-up fs-2"></i>
+      <strong>Drag &amp; drop up to 10 resumes here</strong>
+      <span>or click to select PDF, DOCX or TXT files (max 2 MB each)</span>
+      <small class="bw-count text-muted">No files selected</small>
+    </div>
+    <div class="bw-files small mt-3"></div>
+    <div class="d-flex gap-2 mt-3">
+      <button class="bw-submit btn btn-primary" type="submit" disabled><i class="bi bi-stars me-1"></i>Process Resumes</button>
+      <button class="bw-clear btn btn-outline-secondary" type="button">Clear</button>
+    </div>
+    <div class="bw-result mt-3"></div>
+  </form>
+</div>

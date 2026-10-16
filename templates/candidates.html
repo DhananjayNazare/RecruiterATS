@@ -1,0 +1,215 @@
+{% extends "base.html" %}{% block content %}
+<form class="card mb-3 candidate-search-card" method="get" action="{{url_for('candidates')}}">
+  <div class="card-body p-3 d-flex gap-2 flex-wrap align-items-center">
+    <div class="input-group" style="max-width:420px"><span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input class="form-control" type="search" name="q" value="{{q}}" placeholder="Search name, skills, email, or position name"></div>
+    <select class="form-select" name="position" style="max-width:280px" onchange="this.form.submit()">
+      <option value="0">All positions</option>
+      {% for j in positions %}<option value="{{j.id}}" {% if selected_position==j.id %}selected{% endif %}>{{j.title}}</option>{% endfor %}
+    </select>
+    <div class="input-group" style="max-width:170px" title="Show only candidates whose AI match score is at least this percentage">
+      <span class="input-group-text"><i class="bi bi-stars"></i></span>
+      <input class="form-control" type="number" name="score" min="0" max="100" value="{{score or ''}}" placeholder="AI score %"><span class="input-group-text">%</span></div>
+    <button class="btn btn-primary" type="submit">Search</button>
+    {% if q or selected_position or score %}<a class="btn btn-outline-secondary" href="{{url_for('candidates')}}">Clear</a>{% endif %}
+  </div>
+</form>
+<div class="card">
+  <div class="card-header py-3 px-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+    <div class="d-flex align-items-center gap-3">
+      <span>Candidates Database <span class="text-muted small">({{total}})</span></span>
+      {% if can_send_emails and candidates %}
+      <label class="form-check small mb-0" title="Select all candidates with an email address shown">
+        <input class="form-check-input" type="checkbox" id="selectAllCandidates">
+        <span class="form-check-label">Select all with email</span>
+      </label>
+      {% endif %}
+      {% if candidates %}<span class="small text-muted" id="selectedCandidateCount">0 selected</span>{% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      {% if can_manage_candidates %}
+      <a class="btn btn-add-candidate btn-sm" href="{{url_for('add_candidate')}}">
+        <i class="bi bi-person-plus-fill me-1"></i>Add Candidate
+      </a>
+      {% endif %}
+      {% if can_send_emails and candidates %}
+      <button class="btn btn-primary btn-sm" type="button" id="openBulkCandidateEmail" disabled>
+        <i class="bi bi-envelope-fill me-1"></i>Send Email to Selected
+      </button>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-body p-0">
+    {% if candidates %}
+    <div class="candidate-grid">
+      {% for c in candidates %}
+      <div class="candidate-card candidate-card-professional">
+        <div class="candidate-card-head">
+          {% if can_send_emails %}
+          <label class="candidate-select-wrap{% if not c.email %} candidate-select-disabled{% endif %}" title="{% if c.email %}Select {{c.name}} for email{% else %}No email address on file{% endif %}">
+            <input class="candidate-select" type="checkbox" name="candidate_ids" value="{{c.id}}" data-name="{{c.name|e}}" {% if not c.email %}disabled{% endif %} aria-label="Select {{c.name}}">
+            <span class="candidate-select-box" aria-hidden="true"><i class="bi bi-check-lg"></i></span>
+            <span class="candidate-select-text">{% if c.email %}Select{% else %}No email{% endif %}</span>
+          </label>
+          {% endif %}
+          <img class="candidate-photo" alt="{{c.name}}"
+               src="{% if c.photo %}{{url_for('uploads',name=c.photo)}}{% else %}{{url_for('static',filename='img/avatar-placeholder.svg')}}{% endif %}"
+               onerror="this.src='{{url_for('static',filename='img/avatar-placeholder.svg')}}'">
+          <div class="candidate-card-name">
+            <b><a href="{{url_for('candidate_detail',cid=c.id)}}">{{c.name}}</a></b>
+            <small title="{{c.email or 'No email on file'}}">{{c.email or 'No email on file'}}</small>
+          </div>
+        </div>
+        <div class="candidate-card-meta">
+          <span class="candidate-meta-pill experience"><i class="bi bi-briefcase"></i>{{c.experience_years or 0}} yrs</span>
+          {% if c.location %}<span class="candidate-meta-pill location"><i class="bi bi-geo-alt"></i>{{c.location}}</span>{% endif %}
+          {% if c.phone %}<span class="candidate-meta-pill phone"><i class="bi bi-telephone"></i>{{c.phone}}</span>{% endif %}
+        </div>
+        {% if c.positions %}<div class="candidate-positions" title="Positions"><i class="bi bi-briefcase"></i> {{c.positions}}{% if c.best_score is not none %} <span class="pill">{{c.best_score|int}}%</span>{% endif %}</div>{% endif %}
+        <div class="candidate-card-actions">
+          <a class="btn btn-sm btn-outline-secondary" href="{{url_for('candidate_detail',cid=c.id)}}" title="View Candidate"><i class="bi bi-eye me-1"></i>View</a>
+          <a class="btn btn-sm btn-outline-primary" href="{{url_for('edit_candidate',cid=c.id)}}" title="Edit Candidate"><i class="bi bi-pencil-square"></i></a>
+          <form method="post" action="{{url_for('delete_candidate',cid=c.id)}}" onsubmit="return confirm('Delete this candidate? Their applications and interviews will also be removed.');">
+            <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash"></i></button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted p-4 mb-0">{% if q or selected_position or score %}No candidates match this search.{% else %}No candidates yet.{% endif %}</p>
+    {% endif %}
+    {% if total > candidates|length %}
+    <div class="d-flex align-items-center gap-2 flex-wrap p-3 border-top small">
+      <span class="text-muted">Showing {{candidates|length}} of {{total}}.</span><span>Show</span>
+      <input class="form-control form-control-sm" style="width:80px" type="number" id="moreCount" min="1" max="500" value="10"><span>more</span>
+      <a class="btn btn-outline-primary btn-sm" id="moreBtn" href="#" data-base="{{url_for('candidates',q=q or None,position=selected_position or None,score=score or None)}}" data-shown="{{candidates|length}}">Show more</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{url_for('candidates',q=q or None,position=selected_position or None,score=score or None,shown=500)}}">Show 500</a>
+    </div>
+    <script>document.getElementById('moreBtn').onclick=function(e){e.preventDefault();var n=Math.max(1,parseInt(document.getElementById('moreCount').value)||10);var sep=this.dataset.base.indexOf('?')<0?'?':'&';location.href=this.dataset.base+sep+'shown='+(parseInt(this.dataset.shown)+n);};</script>
+    {% endif %}
+  </div>
+</div>
+
+{% if can_send_emails and candidates %}
+<div class="modal fade" id="bulkCandidateEmailModal" tabindex="-1" aria-labelledby="bulkCandidateEmailLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="bulkCandidateEmailLabel"><i class="bi bi-envelope-paper me-2"></i>Email Selected Candidates</h5>
+          <div class="small text-muted"><span id="bulkEmailRecipientCount">0</span> recipient(s) will receive this message individually via BCC.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{{url_for('bulk_candidate_email')}}" id="bulkCandidateEmailForm">
+        <div class="modal-body">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div id="bulkEmailSelectedIds"></div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="bulkEmailSubject">Subject</label>
+            <input class="form-control" id="bulkEmailSubject" name="subject" maxlength="200" required placeholder="Email subject">
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold" for="bulkEmailMessage">Message</label>
+            <textarea class="form-control" id="bulkEmailMessage" name="message" rows="9" maxlength="10000" required placeholder="Write your email message..."></textarea>
+          </div>
+          <div class="alert alert-info small mt-3 mb-0">
+            <i class="bi bi-shield-lock me-1"></i>Candidate email addresses are placed in <strong>BCC</strong> and are not visible to other recipients.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-send-fill me-1"></i>Send BCC Email</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const allChecks = () => Array.from(document.querySelectorAll('.candidate-select'));
+  const checks = () => allChecks().filter(cb => !cb.disabled);
+  const selected = () => checks().filter(cb => cb.checked);
+  const sendBtn = document.getElementById('openBulkCandidateEmail');
+  const count = document.getElementById('selectedCandidateCount');
+  const selectAll = document.getElementById('selectAllCandidates');
+  const modalEl = document.getElementById('bulkCandidateEmailModal');
+  const modal = modalEl && window.bootstrap ? new bootstrap.Modal(modalEl) : null;
+
+  function updateSelection() {
+    const available = checks();
+    const picked = selected();
+    const n = picked.length;
+    if (count) count.textContent = n + ' selected';
+    if (sendBtn) sendBtn.disabled = n === 0;
+    if (selectAll) {
+      selectAll.checked = available.length > 0 && n === available.length;
+      selectAll.indeterminate = n > 0 && n < available.length;
+      selectAll.setAttribute('aria-checked', selectAll.indeterminate ? 'mixed' : String(selectAll.checked));
+    }
+    document.querySelectorAll('.candidate-select-wrap').forEach(label => {
+      const cb = label.querySelector('.candidate-select');
+      label.classList.toggle('is-selected', !!cb && cb.checked);
+    });
+  }
+
+  allChecks().forEach(cb => cb.addEventListener('change', updateSelection));
+
+  // Explicit click handling keeps selection reliable even if a theme/browser
+  // interferes with the visually-hidden checkbox inside the label.
+  document.querySelectorAll('.candidate-select-wrap:not(.candidate-select-disabled)').forEach(label => {
+    label.addEventListener('click', function (event) {
+      const cb = label.querySelector('.candidate-select');
+      if (!cb || cb.disabled) return;
+      // Let the native checkbox/label behavior handle an actual checkbox click.
+      if (event.target === cb) {
+        updateSelection();
+        return;
+      }
+      event.preventDefault();
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event('change', {bubbles:true}));
+    });
+  });
+
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      checks().forEach(cb => { cb.checked = !!selectAll.checked; });
+      updateSelection();
+    });
+  }
+
+  if (sendBtn) {
+    sendBtn.addEventListener('click', function () {
+      const picked = selected();
+      if (!picked.length) return;
+      const holder = document.getElementById('bulkEmailSelectedIds');
+      if (!holder) return;
+      holder.innerHTML = '';
+      picked.forEach(cb => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'candidate_ids';
+        input.value = cb.value;
+        holder.appendChild(input);
+      });
+      const recipientCount = document.getElementById('bulkEmailRecipientCount');
+      if (recipientCount) recipientCount.textContent = picked.length;
+      if (modal) modal.show();
+      else if (modalEl) modalEl.classList.add('show');
+    });
+  }
+
+  const form = document.getElementById('bulkCandidateEmailForm');
+  if (form) form.addEventListener('submit', function () {
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sending…'; }
+  });
+  updateSelection();
+});
+</script>
+{% endif %}
+
+{% endblock %}

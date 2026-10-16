@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-3 mb-3">
+{% for label,val in [('Total Applications',metrics.total),('Shortlist Rate',metrics.shortlist_rate~'%'),('Interview Rate',metrics.interview_rate~'%'),('Hire Rate',metrics.hire_rate~'%'),('AI Score Coverage',metrics.ai_coverage~'%')] %}
+<div class="col-6 col-lg">
+  <div class="stat-card"><span class="label">{{label}}</span><div class="value">{{val}}</div></div>
+</div>
+{% endfor %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-header py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>Recruitment Analytics</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print / Save PDF</button>
+      <button class="btn btn-sm btn-outline-secondary" type="button" onclick="exportReports()"><i class="bi bi-download me-1"></i>Export CSV</button>
+    </div>
+  </div>
+  <div class="card-body p-4">
+    <div class="row g-4">
+      <div class="col-12 col-lg-6"><canvas id="statusChart" height="240"></canvas></div>
+      <div class="col-12 col-lg-6"><canvas id="sourceChart" height="240"></canvas></div>
+    </div>
+    <div class="row g-4 mt-1">
+      <div class="col-12 col-lg-6"><canvas id="jobChart" height="260"></canvas></div>
+      <div class="col-12 col-lg-6"><canvas id="conversionChart" height="260"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-3 px-4">Hiring Funnel</div>
+      <div class="card-body p-0">
+        <div class="table-responsive"><table class="table mb-0">
+          <tr><th class="ps-4">Status</th><th>Applications</th><th class="pe-4">%</th></tr>
+          {% for x in by_status %}<tr><td class="ps-4">{{x.status}}</td><td>{{x.count}}</td><td class="pe-4">{{((x.count / metrics.total * 100) if metrics.total else 0)|round(1)}}%</td></tr>{% endfor %}
+        </table></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-3 px-4">Source Analytics</div>
+      <div class="card-body p-0">
+        <div class="table-responsive"><table class="table mb-0">
+          <tr><th class="ps-4">Source</th><th>Applications</th><th class="pe-4">%</th></tr>
+          {% for x in by_source %}<tr><td class="ps-4">{{x.source}}</td><td>{{x.count}}</td><td class="pe-4">{{((x.count / metrics.total * 100) if metrics.total else 0)|round(1)}}%</td></tr>{% endfor %}
+        </table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header py-3 px-4">Position Analytics</div>
+  <div class="card-body p-0">
+    <div class="table-responsive"><table class="table mb-0">
+      <tr><th class="ps-4">Position</th><th>Applications</th><th class="pe-4">Average AI Score</th></tr>
+      {% for x in by_job %}<tr><td class="ps-4">{{x.title}}</td><td>{{x.applications}}</td><td class="pe-4">{{x.avg_score if x.avg_score is not none else '—'}}</td></tr>{% endfor %}
+    </table></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const statusData={{by_status|tojson}};const sourceData={{by_source|tojson}};const jobData={{by_job|tojson}};const total={{metrics.total}},hired={{metrics.hired}},shortlisted={{metrics.shortlisted}},interviews={{metrics.interviews}};
+const make=(id,type,labels,data,label)=>new Chart(document.getElementById(id),{type,data:{labels,datasets:[{label,data,backgroundColor:["#1677E8","#44A3F6","#16A36A","#E6A117","#E05263","#7651D8","#14B8A6"],borderRadius:6}]},options:{responsive:true}});
+make("statusChart","doughnut",statusData.map(x=>x.status),statusData.map(x=>x.count),"Applications");
+make("sourceChart","bar",sourceData.map(x=>x.source),sourceData.map(x=>x.count),"Applications");
+make("jobChart","bar",jobData.map(x=>x.title),jobData.map(x=>x.avg_score??0),"Average AI Score");
+make("conversionChart","bar",["Applications","Shortlisted","Interviews","Hired"],[total,shortlisted,interviews,hired],"Count");
+function exportReports(){const rows=[["RecruiterATS Report"],["Metric","Value"],["Total Applications",total],["Shortlist Rate","{{metrics.shortlist_rate}}%"],["Interview Rate","{{metrics.interview_rate}}%"],["Hire Rate","{{metrics.hire_rate}}%"],["AI Score Coverage","{{metrics.ai_coverage}}%"],[],["Status","Applications","Percentage"]];statusData.forEach(x=>rows.push([x.status,x.count,total?((x.count/total)*100).toFixed(1)+"%":"0%"]));rows.push([],["Source","Applications","Percentage"]);sourceData.forEach(x=>rows.push([x.source,x.count,total?((x.count/total)*100).toFixed(1)+"%":"0%"]));rows.push([],["Position","Applications","Average AI Score"]);jobData.forEach(x=>rows.push([x.title,x.applications,x.avg_score??""]));const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="recruiterats_report.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+</script>
+{% endblock %}

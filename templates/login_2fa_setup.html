@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block auth %}
+<div class="login-wrap">
+  <div class="login-card" style="max-width:420px">
+    <div class="text-center mb-4">
+      <div class="brandmark mx-auto mb-2" style="width:52px;height:52px;font-size:24px"><i class="bi bi-shield-lock"></i></div>
+      <h4 class="fw-bold mb-0">Set Up Two-Factor Authentication</h4>
+      <small class="text-muted">Hi {{user_name}}, your administrator requires 2FA on this account before you can continue.</small>
+    </div>
+    {% with messages=get_flashed_messages(with_categories=true) %}
+      {% for cat,msg in messages %}
+      <div class="alert alert-{{ 'danger' if cat=='danger' else 'success' }} py-2">{{msg}}</div>
+      {% endfor %}
+    {% endwith %}
+    <p class="text-muted" style="font-size:13px">Scan this QR code with an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.), then enter the 6-digit code it shows below.</p>
+    <div class="text-center mb-3">
+      <img src="{{url_for('login_2fa_setup_qrcode')}}" alt="2FA QR code" width="180" height="180" class="border rounded p-1 bg-white">
+    </div>
+    <div class="small text-muted mb-1">Can't scan? Enter this key manually:</div>
+    <code class="d-block mb-3 user-select-all text-center">{{secret}}</code>
+    <form method="post">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <div class="mb-3">
+        <label class="form-label">6-digit code</label>
+        <input type="text" class="form-control text-center" style="letter-spacing:6px;font-size:22px" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required autofocus>
+      </div>
+      <button class="btn btn-primary w-100 py-2">Confirm &amp; Continue</button>
+    </form>
+    <p class="text-center mt-3 mb-0"><a href="{{url_for('login_2fa_setup_cancel')}}" class="small text-muted">Cancel and use a different account</a></p>
+  </div>
+</div>
+{% endblock %}

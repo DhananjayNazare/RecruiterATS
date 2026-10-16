@@ -1,0 +1,184 @@
+{% extends "base.html" %}{% block content %}
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-3 px-4">AI Recruitment Workflow</div>
+      <div class="card-body p-4">
+        <ol class="mb-0" style="line-height:2.1">
+          <li>Create a Position and attach its JD</li>
+          <li>Drop resumes and choose the Position</li>
+          <li>AI parses each resume and scores it against that JD</li>
+          <li>Score at or above the threshold → status moves to Interview</li>
+          <li>AI checks the interview calendar and books a free slot</li>
+          <li>Candidate is emailed the date, time and meeting link</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header py-3 px-4">Direct Skill Matching</div>
+      <div class="card-body p-4">
+        <textarea id="jd" class="form-control mb-2" rows="4" placeholder="Paste job description"></textarea>
+        <textarea id="resume" class="form-control mb-3" rows="4" placeholder="Paste resume text"></textarea>
+        <button class="btn btn-primary" id="matchBtn" onclick="directMatch()"><i class="bi bi-stars me-1"></i>AI Compare</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-header py-3 px-4"><i class="bi bi-files me-1"></i>Screen Resumes for a Position</div>
+  <div class="card-body p-4">
+    {% set bw_id='aiBatchWidget' %}
+    {% include '_batch_widget.html' %}
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header py-3 px-4">AI Position (JD) → Existing Candidates Matching</div>
+      <div class="card-body p-4">
+        <div class="match-controls p-3 border rounded-3 bg-light-subtle">
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-lg-5">
+              <label class="form-label fw-semibold small mb-1">Position</label>
+              <select id="aiJobSelect" class="form-select"><option value="">Select a position</option>{% for j in jobs if jobs is defined %}<option value="{{j.id}}" {% if selected_position==j.id %}selected{% endif %}>{{j.title}}</option>{% endfor %}</select>
+            </div>
+            <div class="col-6 col-lg-2">
+              <label class="form-label fw-semibold small mb-1">Threshold</label>
+              <div class="input-group"><input id="aiThreshold" class="form-control" type="number" min="1" max="100" value="{{batch_threshold}}"><span class="input-group-text">%</span></div>
+            </div>
+            <div class="col-6 col-lg-3">
+              <label class="form-label fw-semibold small mb-1">Resumes to Match</label>
+              <input id="aiCandidateLimit" class="form-control" type="number" min="10" step="1" value="10" placeholder="10 or more">
+            </div>
+            <div class="col-12 col-lg-2">
+              <button class="btn btn-primary w-100 match-find-btn" id="findMatchesBtn" onclick="findAIMatches()"><i class="bi bi-search me-1"></i>Find Matches</button>
+            </div>
+          </div>
+          <div class="d-flex align-items-start gap-2 mt-3 small text-muted"><i class="bi bi-info-circle mt-1"></i><span>Enter the number of existing candidate resumes to check. Minimum <b>10</b>; there is no maximum.</span></div>
+        </div>
+        <div class="match-rule-strip mt-2"><span><b>Reject</b> ≤30%</span><span><b>Hold</b> 31–50%</span><span><b>Accept</b> 51–70%</span><span><b>Shortlist</b> 71–79%</span><span><b>Interview</b> threshold+%</span></div>
+        <div id="aiMatchResults" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header py-3 px-4">AI JD Analysis & Interview Questions</div>
+      <div class="card-body p-4">
+        <button class="btn btn-outline-primary btn-sm me-1" onclick="analyzeSelectedJD()"><i class="bi bi-search me-1"></i>Analyze JD</button>
+        <button class="btn btn-outline-primary btn-sm" onclick="generateJDQuestions()"><i class="bi bi-question-circle me-1"></i>Generate Questions</button>
+        <div id="aiJDResults" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="skillMatchModal" tabindex="-1" aria-labelledby="skillMatchModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="skillMatchModalLabel"><i class="bi bi-stars me-2 text-primary"></i>Skill Match Result</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="matchModalBody">
+        <p class="text-muted mb-0">Run a comparison to see results here.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function directMatch(){
+  const btn=document.getElementById('matchBtn');
+  const original=btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Analyzing...';
+  const csrf=document.querySelector('meta[name="csrf-token"]')?.content||'';
+  const body=document.getElementById('matchModalBody');
+  const modal=bootstrap.Modal.getOrCreateInstance(document.getElementById('skillMatchModal'));
+  try{
+    const r=await fetch('{{url_for("ai_match")}}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({job_description:jd.value,resume:resume.value})});
+    const j=await r.json();
+    if(!j.ok){
+      body.innerHTML='<div class="alert alert-danger mb-0">'+escapeHtml(j.error||'AI error')+'</div>';
+    }else{
+      const d=j.data||{};
+      const chips=(arr,cls,icon)=>(arr&&arr.length?arr.map(s=>'<span class="chip chip-tag '+cls+'"><i class="bi '+icon+'"></i>'+escapeHtml(s)+'</span>').join(''):'<span class="text-muted">None</span>');
+      body.innerHTML=
+        '<div class="d-flex align-items-center gap-3 mb-3 flex-wrap">'+
+          '<div class="text-center">'+
+            '<div style="font-size:32px;font-weight:800;color:var(--brand)">'+escapeHtml(d.score??'—')+'</div>'+
+            '<div class="text-muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px">Match Score</div>'+
+          '</div>'+
+          '<div class="flex-grow-1" style="min-width:200px">'+
+            '<div class="fw-bold mb-1">Summary</div>'+
+            '<p class="mb-0 text-muted" style="font-size:13.5px">'+escapeHtml(d.summary||'—')+'</p>'+
+          '</div>'+
+        '</div>'+
+        '<div class="mb-3">'+
+          '<div class="fw-bold mb-2" style="font-size:13px">Matched Skills</div>'+
+          '<div class="d-flex flex-wrap gap-2">'+chips(d.matched_skills,'chip-skill','bi-check-circle')+'</div>'+
+        '</div>'+
+        '<div class="mb-3">'+
+          '<div class="fw-bold mb-2" style="font-size:13px">Missing Skills</div>'+
+          '<div class="d-flex flex-wrap gap-2">'+chips(d.missing_skills,'chip-cat','bi-x-circle')+'</div>'+
+        '</div>'+
+        '<div class="mb-3">'+
+          '<div class="fw-bold mb-2" style="font-size:13px">Transferable Skills</div>'+
+          '<div class="d-flex flex-wrap gap-2">'+chips(d.transferable_skills,'chip-loc','bi-arrow-left-right')+'</div>'+
+        '</div>'+
+        '<div>'+
+          '<div class="fw-bold mb-1" style="font-size:13px">Experience Fit</div>'+
+          '<p class="mb-0 text-muted" style="font-size:13.5px">'+escapeHtml(d.experience_fit||'—')+'</p>'+
+        '</div>';
+    }
+  }catch(e){
+    body.innerHTML='<div class="alert alert-danger mb-0">Request failed: '+escapeHtml(e)+'</div>';
+  }finally{
+    btn.disabled=false; btn.innerHTML=original;
+    modal.show();
+  }
+}
+</script>
+<script>
+async function aiPost(url, payload){
+  const csrf=document.querySelector('meta[name="csrf-token"]')?.content||'';
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(payload||{})});
+  return await r.json();
+}
+function selectedAIJob(){return document.getElementById('aiJobSelect')?.value||'';}
+async function findAIMatches(){
+  const jid=selectedAIJob(), out=document.getElementById('aiMatchResults'), btn=document.getElementById('findMatchesBtn');
+  if(!jid){out.innerHTML='<div class="alert alert-warning mb-0">Select a position first.</div>';return;}
+  const requested=Number(document.getElementById('aiCandidateLimit').value||10);
+  if(!Number.isInteger(requested)||requested<10){out.innerHTML='<div class="alert alert-warning mb-0">Candidates to Match must be 10 or more.</div>';return;}
+  btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Matching...'; out.innerHTML='<div class="text-muted small">AI is checking up to '+requested+' candidates from the existing candidate database...</div>';
+  try{const j=await aiPost('/ai/job/'+jid+'/find-matches',{threshold:Number(document.getElementById('aiThreshold').value||80),candidate_limit:requested,auto_move:true});
+    if(!j.ok){out.innerHTML='<div class="alert alert-danger mb-0">'+escapeHtml(j.error)+'</div>';return;}
+    const m=j.data.matches||[];
+    const resultHtml='<div class="small text-muted mb-2">Checked '+j.data.total_candidates+' candidates · '+m.length+' candidate(s) screened · auto-interview at '+j.data.threshold+'%+</div>'+ (m.length?m.map(x=>'<div class="border rounded p-2 mb-2"><div class="d-flex justify-content-between"><b>'+escapeHtml(x.candidate)+'</b><span class="badge bg-success">'+x.score+'%</span></div><div class="small mt-1"><b>Decision:</b> '+escapeHtml(x.decision||'—')+(x.interview&&x.interview.status==='scheduled'?' · <span class="text-success">Interview booked '+escapeHtml((x.interview.scheduled_at||'').replace('T',' '))+' with '+escapeHtml(x.interview.interviewer||'')+(x.interview.email==='queued'?' · email queued':(x.interview.email==='queued_smtp_missing'?' · email queued (email not configured)':(x.interview.email==='no_email'?' · no candidate email on file':'')))+'</span>':(x.interview&&x.interview.status==='already_scheduled'?' · interview already scheduled':(x.interview&&x.interview.message?' · <span class="text-warning">'+escapeHtml(x.interview.message)+'</span>':'')))+'</div><div class="small mt-1"><b>Why:</b> '+escapeHtml((x.why_match||[]).join(' · '))+'</div><div class="small mt-1"><b>Missing:</b> '+escapeHtml((x.missing_requirements||[]).join(', ')||'None identified')+'</div><div class="mt-2"><a class="btn btn-sm btn-outline-primary" href="/candidates/'+x.candidate_id+'">View Candidate</a>'+(x.email?'<a class="btn btn-sm btn-outline-secondary ms-1" href="mailto:'+encodeURIComponent(x.email)+'">Contact</a>':'')+'</div></div>').join(''):'<div class="alert alert-light border mb-0">No resumes with readable text were found to screen.</div>');
+    document.getElementById('matchModalBody').innerHTML=resultHtml; bootstrap.Modal.getOrCreateInstance(document.getElementById('skillMatchModal')).show();
+  }catch(e){out.innerHTML='<div class="alert alert-danger mb-0">'+escapeHtml(e)+'</div>';}finally{btn.disabled=false;btn.innerHTML='<i class="bi bi-search me-1"></i>Find Matches';}
+}
+async function analyzeSelectedJD(){
+ const jid=selectedAIJob(),out=document.getElementById('aiJDResults'); if(!jid){out.innerHTML='<div class="alert alert-warning mb-0">Select a position first.</div>';return;}
+ out.innerHTML='<div class="text-muted small">Analyzing JD...</div>'; const j=await aiPost('/ai/job/'+jid+'/analyze'); if(!j.ok){out.innerHTML='<div class="alert alert-danger mb-0">'+escapeHtml(j.error)+'</div>';return;} const d=j.data||{}; out.innerHTML='<div class="small"><b>Must-have:</b> '+escapeHtml((d.must_have_skills||[]).join(', ')||'—')+'<br><b>Preferred:</b> '+escapeHtml((d.nice_to_have_skills||[]).join(', ')||'—')+'<br><b>Experience:</b> '+escapeHtml(d.experience_requirements||'—')+'<br><b>Keywords:</b> '+escapeHtml((d.keywords||[]).join(', ')||'—')+'</div>';
+}
+async function generateJDQuestions(){
+ const jid=selectedAIJob(),out=document.getElementById('aiJDResults'); if(!jid){out.innerHTML='<div class="alert alert-warning mb-0">Select a position first.</div>';return;}
+ out.innerHTML='<div class="text-muted small">Generating questions...</div>'; const j=await aiPost('/ai/job/'+jid+'/questions'); if(!j.ok){out.innerHTML='<div class="alert alert-danger mb-0">'+escapeHtml(j.error)+'</div>';return;} const q=j.data?.questions||[...(j.data?.technical_questions||[]),...(j.data?.behavioral_questions||[])]; out.innerHTML='<ol class="small mb-0">'+q.slice(0,8).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ol>';
+}
+</script>
+
+{% endblock %}
+
+<style>
+.match-find-btn{min-height:38px;font-weight:600;white-space:nowrap}
+.match-controls{box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.match-rule-strip{display:flex;flex-wrap:wrap;gap:8px 16px;padding:8px 2px;color:#6c757d;font-size:12px}
+.match-rule-strip span{white-space:nowrap}
+</style>

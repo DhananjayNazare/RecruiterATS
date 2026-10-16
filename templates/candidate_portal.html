@@ -1,0 +1,118 @@
+{% extends "base.html" %}{% block content %}
+{% include "_portal_navbar.html" %}
+<div class="rt-portal" id="candidatePortal">
+  <section class="rt-portal-hero">
+    <div class="rt-portal-avatar"><i class="bi bi-person-badge"></i></div>
+    <div class="rt-portal-intro">
+      <div class="rt-portal-eyebrow">CANDIDATE WORKSPACE</div>
+      <h2>Welcome, {{candidate.name if candidate else user.name}}</h2>
+      <p>Browse open roles, apply with your resume, and follow every recruiter update from your account.</p>
+    </div>
+    <a class="btn btn-outline-secondary rt-portal-logout" href="{{url_for('logout')}}"><i class="bi bi-box-arrow-right me-1"></i>Log out</a>
+  </section>
+
+  <section class="rt-portal-stats">
+    <div class="rt-portal-stat"><span><i class="bi bi-briefcase"></i> Open jobs</span><b>{{stats.open_jobs or 0}}</b></div>
+    <div class="rt-portal-stat"><span><i class="bi bi-file-earmark-text"></i> My applications</span><b>{{stats.applications or 0}}</b></div>
+    <div class="rt-portal-stat"><span><i class="bi bi-camera-video"></i> Interview stage</span><b>{{stats.interviews or 0}}</b></div>
+  </section>
+
+  {% if interviews %}
+  <section class="rt-portal-section" id="my-interviews">
+    <div class="rt-portal-section-head"><div><div class="rt-portal-eyebrow">NEXT STEPS</div><h3>My Interviews</h3><p>AI first-round interviews and recruiter-scheduled meetings are kept separate.</p></div></div>
+    <div class="rt-portal-interviews">
+      {% for i in interviews %}
+      <article class="rt-portal-interview-card">
+        <div class="rt-portal-interview-icon"><i class="bi {{'bi-stars' if i.round_name == 'AI Interview - Round 1' else 'bi-camera-video'}}"></i></div>
+        <div class="rt-portal-interview-main">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><h4>{{i.job}}</h4><span class="badge">{{i.status}}</span></div>
+          <div class="rt-portal-muted">{{i.round_name or 'Interview'}} · {{i.interviewer or 'Recruitment team'}}</div>
+          {% if i.round_name == 'AI Interview - Round 1' %}
+            {% if i.status == 'Awaiting Candidate' and i.ai_schedule_expired %}
+              <p class="rt-portal-note mt-2 mb-2"><i class="bi bi-exclamation-circle me-1"></i>Your 48-hour booking window has expired. Contact the recruitment team to reopen your AI interview invitation.</p>
+              <button class="btn btn-outline-secondary btn-sm" type="button" disabled><i class="bi bi-clock me-1"></i>Set Interview Time — expired</button>
+            {% elif i.status == 'Awaiting Candidate' %}
+              <p class="rt-portal-note mt-2 mb-2"><i class="bi bi-clock-history me-1"></i>You have a 48-hour window to choose your interview time. Select a time before the window closes.</p>
+              <form class="rt-ai-schedule" method="post" action="{{url_for('candidate_schedule_ai_interview',iid=i.id)}}">
+                <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+                <label for="ai-time-{{i.id}}">Choose your AI interview time</label>
+                <div class="rt-ai-schedule-controls"><input id="ai-time-{{i.id}}" class="form-control" type="datetime-local" name="scheduled_at" required min="{{[((i.available_from or '')[:16]), portal_now]|max}}" max="{{(i.available_until or '')[:16]}}"><button class="btn btn-primary" type="submit"><i class="bi bi-calendar-check me-1"></i>Set Interview Time</button></div>
+                <small>Booking closes {{i.available_until or 'within 48 hours'}}. Use your device's local time.</small>
+              </form>
+            {% elif i.status == 'Scheduled' or i.status == 'In Progress' %}
+              <p class="rt-portal-note mt-2 mb-2"><i class="bi bi-calendar-check me-1"></i>Scheduled for <b>{{i.scheduled_at or 'your selected time'}}</b></p>
+              {% if i.ai_can_take %}
+                <a class="btn btn-primary btn-sm" href="{{url_for('candidate_ai_interview',iid=i.id)}}"><i class="bi bi-stars me-1"></i>{% if i.status == 'In Progress' %}Take AI Interview — Continue{% else %}Take AI Interview{% endif %}</a>
+              {% elif i.ai_schedule_expired %}
+                <p class="rt-portal-note mb-2">This invitation window has expired. Contact the recruitment team to reopen it.</p>
+                <button class="btn btn-outline-secondary btn-sm" type="button" disabled><i class="bi bi-clock me-1"></i>Take AI Interview — expired</button>
+              {% else %}
+                <p class="rt-portal-note mb-2"><i class="bi bi-info-circle me-1"></i>Your interview room opens 15 minutes before the selected time ({{i.ai_open_at_display}}).</p>
+                <button class="btn btn-outline-primary btn-sm" type="button" disabled><i class="bi bi-lock me-1"></i>Take AI Interview — not open yet</button>
+              {% endif %}
+            {% elif i.status == 'Completed' %}
+              <p class="rt-portal-note mt-2 mb-0"><i class="bi bi-check-circle me-1"></i>Your AI interview has been submitted to the recruiter. Your account will show any next-step update.</p>
+            {% else %}
+              <p class="rt-portal-muted mt-2 mb-0">Interview status: {{i.status}}</p>
+            {% endif %}
+          {% else %}
+            <p class="rt-portal-muted mt-2 mb-2">{{i.scheduled_at or 'Time to be confirmed'}}</p>
+            {% if i.meeting_link %}<a class="btn btn-outline-primary btn-sm" href="{{i.meeting_link}}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Join external meeting</a>{% endif %}
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="rt-portal-section" id="open-jobs">
+    <div class="rt-portal-section-head"><div><div class="rt-portal-eyebrow">CAREER OPPORTUNITIES</div><h3>Open Jobs</h3><p>You can view every open job before your candidate profile is linked to the recruitment database.</p></div></div>
+    {% if jobs %}
+    <div class="rt-portal-job-grid">
+      {% for j in jobs %}
+      <article class="rt-portal-job-card">
+        <div class="rt-portal-job-top"><span class="rt-portal-job-icon"><i class="bi bi-briefcase"></i></span><span class="badge">{{j.employment_type or 'Role'}}</span></div>
+        <h4>{{j.title}}</h4>
+        <div class="rt-portal-job-meta"><span><i class="bi bi-building me-1"></i>{{j.company or 'Company not specified'}}</span><span><i class="bi bi-geo-alt me-1"></i>{{j.location or 'Location flexible / not specified'}}</span></div>
+        <details class="rt-portal-job-details"><summary>View job description and requirements</summary><p>{{j.description or 'No description provided.'}}</p>{% if j.requirements %}<p><b>Requirements</b><br>{{j.requirements}}</p>{% endif %}</details>
+        <div class="rt-portal-job-action">
+          {% if j.application_id %}<span class="badge rt-portal-applied"><i class="bi bi-check-circle me-1"></i>{{j.application_status}}</span>{% else %}<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#applyModal{{j.id}}"><i class="bi bi-send me-1"></i>Apply for this role</button>{% endif %}
+        </div>
+      </article>
+      {% if not j.application_id %}
+      <div class="modal fade" id="applyModal{{j.id}}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><form class="modal-content" method="post" action="{{url_for('candidate_apply',jid=j.id)}}" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div class="modal-header"><div><div class="rt-portal-eyebrow">JOB APPLICATION</div><h5 class="modal-title">Apply — {{j.title}}</h5></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+          <div class="modal-body">
+            <p class="rt-portal-muted">Upload a resume so the recruiter can review your experience for this role. PDF, DOCX or TXT; maximum 2 MB.</p>
+            <label class="form-label" for="resume-{{j.id}}">Resume {% if not candidate or not candidate.resume_file %}<span class="text-danger">*</span>{% else %}<span class="text-muted">(optional — profile already has a resume)</span>{% endif %}</label>
+            <input id="resume-{{j.id}}" class="form-control mb-3" type="file" name="resume_file" accept=".pdf,.docx,.txt" {% if not candidate or not candidate.resume_file %}required{% endif %}>
+            <label class="form-label" for="docs-{{j.id}}">Additional documents (optional)</label>
+            <input id="docs-{{j.id}}" class="form-control" type="file" name="documents" accept=".pdf,.docx,.txt" multiple>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Submit application</button></div>
+        </form></div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}<div class="rt-portal-empty"><i class="bi bi-briefcase"></i><b>No open jobs right now</b><span>Check back later for new opportunities.</span></div>{% endif %}
+  </section>
+
+  <section class="rt-portal-section" id="my-applications">
+    <div class="rt-portal-section-head"><div><div class="rt-portal-eyebrow">APPLICATION TRACKER</div><h3>My Applications</h3><p>Recruiter decisions and interview invitations will appear here after you sign in.</p></div></div>
+    {% if applications %}
+    <div class="table-responsive rt-portal-table-wrap"><table class="table align-middle mb-0"><thead><tr><th>Position</th><th>Applied</th><th>Status / update</th><th>Documents</th><th class="text-end">Actions</th></tr></thead><tbody>
+    {% for a in applications %}
+      <tr><td><b>{{a.job}}</b><div class="rt-portal-muted">{{a.company or '—'}} · {{a.location or '—'}}</div></td><td>{{a.created_at or '—'}}</td><td><span class="badge">{{a.status}}</span>{% if a.status in ['Accepted','Shortlisted','Interview'] %}<div class="rt-portal-note mt-2">You have been selected for the next interview step. Check “My Interviews” above.</div>{% elif a.status == 'Rejected' %}<div class="rt-portal-muted mt-1">This application is closed.</div>{% elif a.status in ['Accepted','Offer','Hired'] %}<div class="rt-portal-note mt-1">The recruiting team has updated your application.</div>{% endif %}</td>
+      <td>{% if a.documents %}{% for d in a.documents %}<a class="d-block small" target="_blank" rel="noopener" href="{{url_for('candidate_document',aid=a.id,fname=d.file)}}"><i class="bi bi-file-earmark-text me-1"></i>{{d.name}}</a>{% endfor %}{% else %}<span class="rt-portal-muted">No extra documents</span>{% endif %}</td>
+      <td class="text-end"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#docModal{{a.id}}"><i class="bi bi-upload me-1"></i>Add documents</button></td></tr>
+    {% endfor %}
+    </tbody></table></div>
+    {% for a in applications %}<div class="modal fade" id="docModal{{a.id}}" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" method="post" action="{{url_for('candidate_upload_documents',aid=a.id)}}" enctype="multipart/form-data"><input type="hidden" name="_csrf_token" value="{{csrf_token}}"><div class="modal-header"><h5 class="modal-title">Add documents — {{a.job}}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input class="form-control" type="file" name="documents" accept=".pdf,.docx,.txt" multiple required><div class="form-text">PDF, DOCX or TXT; maximum 2 MB per file.</div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Upload documents</button></div></form></div></div>{% endfor %}
+    {% else %}<div class="rt-portal-empty"><i class="bi bi-file-earmark-text"></i><b>No applications yet</b><span>Choose a role above to submit your first application.</span></div>{% endif %}
+  </section>
+</div>
+{% endblock %}

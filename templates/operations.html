@@ -1,0 +1,90 @@
+{% extends "base.html" %}{% block content %}
+<div class="row g-3 mb-3">
+{% for kind,label,icon in [('companies','Companies','bi-building')] %}
+<div class="col-12">
+  <div class="card h-100">
+    <div class="card-header py-3 px-4"><i class="bi {{icon}} me-2 text-primary"></i>{{label}}</div>
+    <div class="card-body p-3">
+      {% if kind=='companies' %}
+      <div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCompanyModal"><i class="bi bi-plus-lg me-1"></i>Create Company</button></div>
+      {% endif %}
+
+      {% if kind=='companies' %}
+      <div class="candidate-grid company-as-candidate-grid">
+        {% for x in data[kind] %}
+        <div class="candidate-card candidate-card-professional" id="company-{{x.id}}">
+          <div class="candidate-card-head">
+            <div class="company-avatar company-avatar-card">{{x.name[0]|upper}}</div>
+            <div class="candidate-card-name">
+              <b>{{x.name}}</b>
+              <small title="{{x.email or x.contact_email or 'No email on file'}}">{{x.email or x.contact_email or 'No email on file'}}</small>
+            </div>
+          </div>
+          <div class="candidate-card-meta">
+            {% if x.industry %}<span class="candidate-meta-pill experience"><i class="bi bi-building"></i>{{x.industry}}</span>{% endif %}
+            {% if x.contact_person %}<span class="candidate-meta-pill location"><i class="bi bi-person"></i>{{x.contact_person}}</span>{% endif %}
+            {% if x.contact_number %}<span class="candidate-meta-pill phone"><i class="bi bi-telephone"></i>{{x.contact_number}}</span>{% endif %}
+            {% if x.website %}<span class="candidate-meta-pill location"><i class="bi bi-globe"></i>{{x.website}}</span>{% endif %}
+            {% if not x.industry and not x.contact_person and not x.contact_number and not x.website %}<span class="candidate-meta-pill"><i class="bi bi-info-circle"></i>No contact details yet</span>{% endif %}
+          </div>
+          {% if x.categories or x.locations or x.skills %}
+          <div class="candidate-positions">
+            {% if x.categories %}<i class="bi bi-grid"></i> {{x.categories}}{% endif %}
+            {% if x.locations %} <i class="bi bi-geo-alt ms-2"></i> {{x.locations}}{% endif %}
+            {% if x.skills %} <i class="bi bi-tools ms-2"></i> {{x.skills}}{% endif %}
+          </div>
+          {% endif %}
+          <div class="candidate-card-actions">
+            <a class="btn btn-sm btn-outline-primary" href="{{url_for('operations_edit_company',item_id=x.id)}}" title="Edit Company"><i class="bi bi-pencil-square me-1"></i>Edit</a>
+            <form method="post" action="{{url_for('operations_delete',kind=kind,item_id=x.id)}}" onsubmit="return confirm('Delete \'{{x.name}}\'?');">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <button class="btn btn-sm btn-outline-danger" type="submit" title="Delete"><i class="bi bi-trash"></i></button>
+            </form>
+          </div>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No companies yet.</p>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="d-flex flex-wrap gap-2 chip-list">
+        {% for x in data[kind] %}
+        <span class="chip d-inline-flex align-items-center gap-1">
+          {{x.name}}
+          <form method="post" action="{{url_for('operations_delete',kind=kind,item_id=x.id)}}" onsubmit="return confirm('Delete \'{{x.name}}\'?');" class="d-inline">
+            <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+            <button class="btn btn-sm btn-link text-danger p-0" style="line-height:1" type="submit" title="Delete"><i class="bi bi-x-circle"></i></button>
+          </form>
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+
+<div class="modal fade" id="createCompanyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title"><i class="bi bi-building me-2 text-primary"></i>Create Company</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body">
+        <form method="post" action="{{url_for('operations_add',kind='companies')}}" id="createCompanyForm">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div class="row g-2 mb-2">
+            <div class="col-12 col-sm-6"><input class="form-control" name="name" placeholder="Company name" required></div>
+            <div class="col-12 col-sm-6"><input class="form-control" name="industry" placeholder="Industry"></div>
+            <div class="col-12 col-sm-6"><input class="form-control" name="website" placeholder="Website"></div>
+            <div class="col-12 col-sm-6"><input class="form-control" type="email" name="email" placeholder="Company email"></div>
+            <div class="col-12 col-sm-6"><input class="form-control" name="contact_person" placeholder="Contact person name"></div>
+            <div class="col-12 col-sm-6"><input class="form-control" type="email" name="contact_email" placeholder="Contact person email"></div>
+            <div class="col-12"><input class="form-control" name="contact_number" placeholder="Contact number"></div>
+          </div>
+          <div class="d-flex justify-content-end gap-2 mt-3"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>Create Company</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

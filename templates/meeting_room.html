@@ -1,0 +1,64 @@
+{% extends "base.html" %}{% block content %}
+<div class="meeting-shell">
+  <div class="meeting-header">
+    <div>
+      <div class="small text-muted">RecruiterATS • Online Interview</div>
+      <h3 class="mb-0">{{interview.job}} — {{interview.round_name or 'Interview'}}</h3>
+      <div class="small text-muted mt-1">{{interview.candidate}} · {{interview.scheduled_at or 'Scheduled'}}</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge text-bg-success">{{participant_role}}</span>
+      <a class="btn btn-sm btn-outline-secondary" href="{{url_for('logout')}}"><i class="bi bi-box-arrow-right me-1"></i>Exit</a>
+    </div>
+  </div>
+
+  <div class="row g-3 flex-grow-1">
+    <div class="col-12 {% if participant_role != 'Candidate' %}col-xl-8{% endif %}">
+      <div class="meeting-video-card">
+        
+          <div class="external-meeting">
+            <i class="bi bi-camera-video fs-1 text-primary"></i>
+            <h4 class="mt-3">{{interview.meeting_provider or 'Online Meeting'}}</h4>
+            <p class="text-muted">This interview uses an external meeting provider.</p>
+            {% if interview.meeting_link %}<a class="btn btn-primary btn-lg" target="_blank" rel="noopener" href="{{interview.meeting_link}}"><i class="bi bi-box-arrow-up-right me-2"></i>Open {{interview.meeting_provider}}</a>{% else %}<div class="alert alert-warning">Meeting link has not been configured yet.</div>{% endif %}
+          </div>
+      </div>
+    </div>
+
+    {% if participant_role != 'Candidate' %}
+    <div class="col-12 col-xl-4">
+      <div class="card ai-interview-card h-100">
+        <div class="card-header py-3 px-4 d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-stars me-2 text-primary"></i>AI Interview Assistant</span>
+          <span class="ai-badge {% if ai_enabled %}on{% endif %}">{{'Connected' if ai_enabled else 'Not configured'}}</span>
+        </div>
+        <div class="card-body p-3">
+          <button class="btn btn-outline-primary w-100 mb-3" type="button" onclick="aiInterviewQuestions()"><i class="bi bi-list-stars me-1"></i>Generate Interview Questions</button>
+          <label class="form-label small">Interviewer Notes</label>
+          <textarea id="aiInterviewNotes" class="form-control" rows="9" placeholder="Enter notes during or after the interview..."></textarea>
+          <button class="btn btn-primary w-100 mt-2" type="button" onclick="aiInterviewEvaluate()"><i class="bi bi-stars me-1"></i>AI Evaluate Notes</button>
+          <div id="aiInterviewResult" class="mt-3 small"></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+<script>
+async function aiInterviewQuestions(){
+  const box=document.getElementById('aiInterviewResult'); box.innerHTML='<div class="text-muted">Generating questions…</div>';
+  const r=await fetch('{{url_for("ai_interview_assistant",iid=interview.id)}}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'{{csrf_token}}'},body:JSON.stringify({mode:'questions'})});
+  const d=await r.json(); if(!d.ok){box.innerHTML='<div class="alert alert-danger">'+d.error+'</div>';return;}
+  box.innerHTML='<b>Suggested questions</b><ol class="mt-2">'+(d.data.questions||[]).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ol>';
+}
+async function aiInterviewEvaluate(){
+  const notes=document.getElementById('aiInterviewNotes').value.trim(); const box=document.getElementById('aiInterviewResult');
+  if(!notes){box.innerHTML='<div class="alert alert-warning">Enter interview notes first.</div>';return;}
+  box.innerHTML='<div class="text-muted">Evaluating…</div>';
+  const r=await fetch('{{url_for("ai_interview_assistant",iid=interview.id)}}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'{{csrf_token}}'},body:JSON.stringify({mode:'evaluate',notes})});
+  const d=await r.json(); if(!d.ok){box.innerHTML='<div class="alert alert-danger">'+d.error+'</div>';return;}
+  const x=d.data||{}; box.innerHTML='<div class="alert alert-light"><b>AI score: '+(x.score??'—')+'/100</b><hr><b>Summary</b><div>'+escapeHtml(x.summary||'')+'</div><div class="mt-2"><b>Strengths</b><ul>'+((x.strengths||[]).map(v=>'<li>'+escapeHtml(v)+'</li>').join(''))+'</ul><b>Concerns</b><ul>'+((x.concerns||[]).map(v=>'<li>'+escapeHtml(v)+'</li>').join(''))+'</ul></div></div>';
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+</script>
+{% endblock %}

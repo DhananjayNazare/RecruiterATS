@@ -1,0 +1,175 @@
+{% extends "base.html" %}{% block content %}
+<div class="card mb-3">
+  <div class="card-body p-4">
+    <h5 class="fw-bold mb-1">User Management</h5>
+    <p class="text-muted mb-0" style="font-size:13px">Admins can create Recruiter, Manager, Interviewer and Candidate accounts, manually set each non-Admin user's permission level, and require or reset two-factor authentication for other accounts.</p>
+  </div>
+</div>
+
+{% if user.role=="Admin" %}
+<div class="card mb-3">
+  <div class="card-header py-3 px-4">Add User</div>
+  <div class="card-body p-4">
+    <form class="row g-3" method="post" action="{{url_for('add_user')}}">
+      <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+      <div class="col-12 col-md-3"><input class="form-control" name="name" placeholder="Name" required></div>
+      <div class="col-12 col-md-3"><input type="email" class="form-control" name="email" placeholder="Email" required></div>
+      <div class="col-12 col-md-3"><input type="password" class="form-control" name="password" placeholder="Password" required></div>
+      <div class="col-8 col-md-2">
+        <select class="form-select" name="role" id="newUserRole" onchange="document.getElementById('candidateLinkWrap').style.display=(this.value==='Candidate'?'block':'none')">
+          {% for r in roles %}<option {% if r=='Recruiter' %}selected{% endif %}>{{r}}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3" id="candidateLinkWrap" style="display:none">
+        <select class="form-select" name="candidate_id">
+          <option value="">Link Candidate Profile (optional)</option>
+          {% for c in candidates_for_users %}<option value="{{c.id}}">{{c.name}}{% if c.email %} — {{c.email}}{% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-4 col-md-1"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card mb-3">
+  <div class="card-header py-3 px-4">Users &amp; Permission Levels</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <tr><th class="ps-4">Name</th><th>Email</th><th>Role</th><th>Status</th><th>Permission Level</th><th>2FA</th><th class="pe-4">Actions</th></tr>
+      {% for u in users %}
+      <tr>
+        <td class="ps-4"><b>{{u.name}}</b></td>
+        <td>{{u.email}}</td>
+        <td>
+          <span class="badge rounded-pill
+            {% if u.role=='Admin' %}text-bg-primary
+            {% elif u.role=='Manager' %}text-bg-info
+            {% elif u.role=='Interviewer' %}text-bg-warning
+            {% elif u.role=='Candidate' %}text-bg-secondary
+            {% else %}text-bg-secondary{% endif %}">{{u.role}}</span>
+        </td>
+        <td>
+          <span class="badge rounded-pill {% if u.active %}text-bg-success{% else %}text-bg-danger{% endif %}">{{'Active' if u.active else 'Inactive'}}</span>
+        </td>
+        <td>
+          {% if u.role=="Admin" %}
+            <span class="text-muted">Full access</span>
+          {% elif user.role=="Admin" %}
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#perm-{{u.id}}">
+              <i class="bi bi-sliders me-1"></i>Set permissions
+            </button>
+          {% else %}
+            {% set granted_count = permissions[u.id].values()|select|list|length %}
+            <span class="text-muted">{{granted_count}} permission{{'s' if granted_count!=1 else ''}} granted</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if u.totp_enabled %}
+            <span class="badge rounded-pill text-bg-success"><i class="bi bi-shield-check me-1"></i>Enabled</span>
+          {% elif u.totp_required %}
+            <span class="badge rounded-pill text-bg-warning text-dark"><i class="bi bi-shield-exclamation me-1"></i>Required — not set up</span>
+          {% else %}
+            <span class="badge rounded-pill text-bg-light text-muted border">Off</span>
+          {% endif %}
+          {% if user.role=="Admin" and u.id != user.id %}
+          <div class="d-flex flex-column gap-1 mt-1" style="max-width:170px">
+            {% if u.totp_required %}
+            <form method="post" action="{{url_for('admin_manage_2fa')}}">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <input type="hidden" name="user_id" value="{{u.id}}">
+              <input type="hidden" name="action" value="unrequire">
+              <button class="btn btn-sm btn-link p-0 small" type="submit">Remove requirement</button>
+            </form>
+            {% else %}
+            <form method="post" action="{{url_for('admin_manage_2fa')}}">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <input type="hidden" name="user_id" value="{{u.id}}">
+              <input type="hidden" name="action" value="require">
+              <button class="btn btn-sm btn-link p-0 small" type="submit">Require 2FA</button>
+            </form>
+            {% endif %}
+            {% if u.totp_enabled %}
+            <form method="post" action="{{url_for('admin_manage_2fa')}}" onsubmit="return confirm('Disable/reset two-factor authentication for {{u.name}}? They will need to set it up again.');">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <input type="hidden" name="user_id" value="{{u.id}}">
+              <input type="hidden" name="action" value="disable">
+              <button class="btn btn-sm btn-link p-0 small text-danger" type="submit">Disable / reset</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+        </td>
+        <td class="pe-4">
+          {% if u.id != user.id and (user.role=="Admin" or u.role!="Admin") %}
+          <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-sm btn-outline-primary" href="{{url_for('edit_user', user_id=u.id)}}">
+              <i class="bi bi-pencil-square me-1"></i>Edit
+            </a>
+            <form method="post" action="{{url_for('toggle_user')}}">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <input type="hidden" name="user_id" value="{{u.id}}">
+              <button class="btn btn-sm btn-outline-secondary" type="submit">
+                <i class="bi {{'bi-pause-circle' if u.active else 'bi-play-circle'}} me-1"></i>{{'Deactivate' if u.active else 'Activate'}}
+              </button>
+            </form>
+            <form method="post" action="{{url_for('reset_voice_password', user_id=u.id)}}" onsubmit="return confirm('Clear the voice-command password for {{u.name}}? They must create a new one.');">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <button class="btn btn-sm btn-outline-secondary" type="submit" title="Clear voice-command password"><i class="bi bi-mic-mute me-1"></i>Reset voice</button>
+            </form>
+            <form method="post" action="{{url_for('delete_user')}}" onsubmit="return confirm('Delete this user permanently? Historical audit records will be preserved without the user account.');">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <input type="hidden" name="user_id" value="{{u.id}}">
+              <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>Delete</button>
+            </form>
+          </div>
+          {% else %}<span class="text-muted">Protected</span>{% endif %}
+        </td>
+      </tr>
+      {% if u.role!="Admin" and user.role=="Admin" %}
+      <tr class="collapse" id="perm-{{u.id}}">
+        <td colspan="7" class="bg-light-subtle p-0">
+          <form method="post" action="{{url_for('set_user_permissions')}}" class="p-3 ps-4">
+            <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+            <input type="hidden" name="user_id" value="{{u.id}}">
+            <div class="fw-bold mb-2" style="font-size:13px">Manual permission level for {{u.name}}</div>
+            <div class="row g-2 mb-2">
+              {% for key,label,desc in permission_defs %}
+              <div class="col-12 col-md-6 col-xl-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="perm_{{key}}" value="1" id="perm-{{u.id}}-{{key}}" {% if permissions[u.id][key] %}checked{% endif %}>
+                  <label class="form-check-label" for="perm-{{u.id}}-{{key}}">
+                    {{label}}<br><small class="text-muted">{{desc}}</small>
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Save Permissions</button>
+          </form>
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </table>
+    </div>
+  </div>
+</div>
+
+
+
+<div class="card">
+  <div class="card-header py-3 px-4">Audit Log</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+    <table class="table mb-0">
+      <tr><th class="ps-4">Time</th><th>User</th><th>Action</th><th>Entity</th><th class="pe-4">Details</th></tr>
+      {% for l in logs %}
+      <tr><td class="ps-4">{{l.created_at}}</td><td>{{l.name or 'System'}}</td><td>{{l.action}}</td><td>{{l.entity}}</td><td class="pe-4">{{l.details}}</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

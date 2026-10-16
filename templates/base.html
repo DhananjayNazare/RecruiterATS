@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<title>{{ title or "RecruiterATS" }}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static',filename='app.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='ui_template.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='dark.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='voice_assistant.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='rust_ui.css') }}">
+<script>(function(){try{var t=localStorage.getItem('ats-theme');if(!t){t=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-bs-theme',t);}catch(e){}})();</script>
+</head>
+<body>
+{% if user %}
+{% set normal_shell = not (is_candidate_portal or is_interviewer_portal or is_meeting_room or request.args.get('popup')) %}
+{% if normal_shell %}
+{% set page_meta = {
+  'dashboard': ('Dashboard','Recruitment overview and hiring activity'),
+  'jobs': ('Positions','Create positions, attach JDs and monitor hiring'),
+  'candidates': ('Candidates','Search, review and manage your talent database'),
+  'candidate_detail': ('Candidate Profile','Review candidate details, applications and activity'),
+  'add_candidate': ('Add Candidate','Create a candidate profile and upload resume details'),
+  'edit_candidate': ('Edit Candidate','Update candidate information and recruitment data'),
+  'applications': ('Applications','Track candidates through the hiring pipeline'),
+  'ai_center': ('AI Screening','Match candidates against job requirements with AI'),
+  'interviews': ('Interviews','Schedule and manage candidate interviews'),
+  'calendar_view': ('Calendar','Manage interviews, meetings and candidate interactions'),
+  'integrations': ('Meetings','Manage meeting providers and job posting integrations'),
+  'meeting_room': ('Interview Room','Run the interview and collaborate with the panel'),
+  'operations': ('Team','Manage recruiters, companies, tasks and communication'),
+  'reports': ('Reports','Monitor hiring performance and recruitment metrics'),
+  'admin': ('Users & Roles','Manage users, permissions, security and scheduled emails'),
+  'user_edit': ('Edit User','Update account access and role permissions'),
+  'settings': ('Settings','Configure AI, security, email and backups'),
+  'company_edit': ('Edit Company','Update company and recruitment organization details'),
+  'interviewer_panel': ('Interviewer Portal','Review assigned interviews and candidates'),
+  'interviewer_interview': ('Interview Details','Review the candidate and scheduled interview'),
+  'candidate_panel': ('Candidate Portal','Manage applications and interview activity')
+} %}
+{% set shell_meta = page_meta.get(request.endpoint, (title or 'RecruiterATS','Manage your recruitment workflow in one place')) %}
+<div class="rt-shell">
+  <aside class="rt-sidebar" id="mainSidebar">
+    <a class="rt-brand" href="{{url_for('dashboard')}}">
+      <span class="rt-brandmark"><i class="bi bi-people-fill"></i></span>
+      <span class="rt-brand-text">Recruiter<b>ATS</b></span>
+    </a>
+    <nav class="rt-nav sidebar-nav-pro">
+      <a class="nav-link" href="{{url_for('dashboard')}}"><i class="bi bi-grid-1x2-fill"></i><span>Dashboard</span></a>
+      <a class="nav-link" href="{{url_for('jobs')}}"><i class="bi bi-briefcase-fill"></i><span>Positions</span></a>
+      <a class="nav-link" href="{{url_for('candidates')}}"><i class="bi bi-people-fill"></i><span>Candidates</span></a>
+      <a class="nav-link" href="{{url_for('applications')}}"><i class="bi bi-kanban-fill"></i><span>Applications</span></a>
+      <a class="nav-link" href="{{url_for('ai_center')}}"><i class="bi bi-stars"></i><span>AI Screening</span></a>
+      <a class="nav-link" href="{{url_for('calendar_view')}}"><i class="bi bi-calendar3"></i><span>Calendar</span></a>
+      <a class="nav-link" href="{{url_for('operations')}}"><i class="bi bi-person-badge-fill"></i><span>Team</span></a>
+      <a class="nav-link" href="{{url_for('integrations')}}"><i class="bi bi-chat-dots-fill"></i><span>Meetings</span></a>
+      <a class="nav-link" href="{{url_for('reports')}}"><i class="bi bi-bar-chart-fill"></i><span>Reports</span></a>
+      {% if can_manage_users %}<a class="nav-link" href="{{url_for('admin')}}"><i class="bi bi-shield-lock-fill"></i><span>Admin</span></a>{% endif %}
+      <a class="nav-link" href="{{url_for('settings')}}"><i class="bi bi-gear-fill"></i><span>Settings</span></a>
+    </nav>
+  </aside>
+  <div class="rt-main" id="mainContent">
+    <header class="rt-topbar">
+      <button type="button" class="rt-icon-btn sidebar-toggle" id="sidebarToggleBtn" aria-label="Toggle sidebar" aria-expanded="true"><i class="bi bi-list"></i></button>
+      <div class="rt-search global-search" id="globalSearchWrap">
+        <i class="bi bi-search"></i>
+        <input id="globalSearchInput" type="search" placeholder="Search candidates, positions, or anything..." aria-label="Search" autocomplete="off">
+        <div id="globalSearchResults" class="global-search-results" hidden></div>
+      </div>
+      <div class="rt-top-actions">
+        <div class="dropdown ai-pill-wrap">
+          <button type="button" class="ai-pill {% if ai_switch.ai_master %}on{% endif %}" id="aiPill" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="AI on / off"><i></i><span id="aiPillText">AI {{ 'ON' if ai_switch.ai_master else 'OFF' }}</span></button>
+          <div class="dropdown-menu dropdown-menu-end p-3 ai-pill-menu">
+            <div class="fw-semibold mb-2">AI decisions</div>
+            {% include '_ai_switches.html' %}
+          </div>
+        </div>
+        {% if user.role=="Admin" %}
+        <span class="ai-connected-indicator {% if ai_enabled %}connected{% else %}disconnected{% endif %}" id="aiConnectionIndicator" data-ai-configured="{{ 1 if ai_enabled else 0 }}" title="AI service status"><i class="bi bi-circle-fill"></i> AI {{ "Connected" if ai_enabled else "Not Connected" }}</span>
+        {% endif %}
+        <button class="rt-icon-btn va-live-btn" id="vaLiveMic" type="button" title="Turn the mic on to talk to the app" aria-label="Mic: talk to the app" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg></button>
+        <div class="va-wrap" id="vaWrap">
+          <button class="rt-icon-btn va-btn" type="button" title="Voice assistant panel" aria-label="Voice assistant panel"><i class="bi bi-robot"></i></button>
+          <div class="va-panel" hidden>
+            <div class="va-head"><b>Voice Assistant</b><span class="va-badge">works offline</span></div>
+            <div class="va-quick">
+              <button type="button" data-va="all">Summarise my day</button>
+              <button type="button" data-va="daily">Daily tasks</button>
+              <button type="button" data-va="custom">Custom tasks</button>
+              <button type="button" data-va="reminders">Reminders</button>
+              <button type="button" data-va="stop" class="va-stop">Stop</button>
+            </div>
+            <form class="va-row va-form"><input class="va-input" placeholder="Type or say a command…" aria-label="Voice command" autocomplete="off"><button type="button" class="va-mic" title="Speak a command" aria-label="Speak a command"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2z"/></svg></button><button type="submit">Go</button></form>
+            <div class="va-mic-state" aria-live="polite"></div>
+            <div class="va-svc" data-state="locked">
+              <div class="va-svc-head"><b>Voice commands</b><span class="va-svc-state">Locked</span></div>
+              <form class="va-row va-svc-unlock" autocomplete="off"><input type="password" class="va-svc-pw" placeholder="Voice password (type it)" autocomplete="new-password" aria-label="Voice password"><button type="submit">Unlock</button></form>
+              <form class="va-svc-setup" autocomplete="off" hidden>
+                <div class="va-svc-note">Create a voice password. Type it — never say it aloud. It must differ from your login password.</div>
+                <input type="password" class="va-svc-login" placeholder="Your login password" autocomplete="current-password" aria-label="Your login password">
+                <input type="password" class="va-svc-new" placeholder="New voice password" autocomplete="new-password" aria-label="New voice password">
+                <input type="password" class="va-svc-new2" placeholder="Repeat voice password" autocomplete="new-password" aria-label="Repeat voice password">
+                <ul class="va-svc-rules"><li data-rule="len">16 or more characters</li><li data-rule="num">a number</li><li data-rule="sym">a special symbol (! @ # $ %)</li><li data-rule="up">an uppercase letter</li><li data-rule="low">a lowercase letter</li><li data-rule="same">both boxes match</li></ul>
+                <div class="va-row"><button type="submit">Save voice password</button><button type="button" class="va-svc-cancel">Cancel</button></div>
+              </form>
+              <div class="va-svc-on va-row" hidden><span class="va-svc-timer"></span><button type="button" class="va-svc-lock">Lock now</button><button type="button" class="va-svc-change">Change password</button></div>
+              <div class="va-svc-error" role="alert"></div>
+              <details class="va-svc-help"><summary>What can I say?</summary>
+                <ul>
+                  <li><b>Go:</b> “open candidates”, “go to calendar”, “open reports”</li>
+                  <li><b>Find:</b> “find Priya”, “how many candidates”</li>
+                  <li><b>Add:</b> “add candidate Priya Sharma email priya at example dot com”, “add position Python Developer”, “add user Rahul Sharma, rahul at example dot com, as recruiter”</li>
+                  <li><b>Update:</b> “move Priya to shortlisted”, “reject Amit for QA Engineer”, “mark task call Raj done”</li>
+                  <li><b>Interviews:</b> “schedule interview for Priya tomorrow at 11 am”, “cancel interview for Priya”, “screen Priya for Python Developer”</li>
+                  <li><b>Delete (asks you to say yes):</b> “delete candidate Amit”, “delete user Rahul”, “delete position QA Engineer”, “delete task call Raj”</li>
+                  <li><b>Lock:</b> “lock”. It also locks itself when idle and when you log off.</li>
+                </ul>
+              </details>
+            </div>
+            <div class="va-rem-box">
+              <div class="va-rem-title">My reminders</div>
+              <form class="va-row va-rem-form"><input class="va-rem-text" placeholder="Remind me to…" aria-label="Reminder text" maxlength="200" autocomplete="off"><input class="va-rem-at" type="datetime-local" aria-label="Reminder date and time"><button type="submit">Add</button></form>
+              <ul class="va-rem-list" aria-live="polite"></ul>
+            </div>
+            <div class="va-log" aria-live="polite"></div>
+            <div class="va-opts">
+              <label><input type="checkbox" class="va-rem"> Reminders</label>
+              <label><input type="checkbox" class="va-remspeak"> Speak them</label>
+              <label><input type="checkbox" class="va-auto"> Daily briefing</label>
+              <select class="va-voice" aria-label="Voice"></select>
+            </div>
+            <div class="va-hint">Try: “add task call Raj tomorrow”, “remind me in 10 minutes to send the offer”, “list reminders”. Unlock <b>Voice commands</b> above to act on candidates, positions, interviews and users.</div>
+          </div>
+        </div>
+        <button class="rt-icon-btn theme-toggle" id="themeToggleBtn" type="button" title="Switch day / night mode" aria-label="Switch day / night mode"><i class="bi bi-moon-stars-fill"></i><i class="bi bi-sun-fill"></i></button>
+        <div class="notification-wrap">
+          <button class="rt-icon-btn" id="notificationBellBtn" type="button" title="Notifications" aria-expanded="false">
+            <i class="bi bi-bell"></i><span class="notification-count" id="notificationCount">0</span>
+          </button>
+          <div class="notification-panel" id="notificationPanel" hidden>
+            <div class="notification-panel-head"><b>Notifications</b><span class="notification-head-actions"><button type="button" id="notificationClear" class="btn btn-sm btn-link text-danger">Clear all</button><button type="button" id="notificationClose" class="btn btn-sm btn-link">Close</button></span></div>
+            <div id="notificationList" class="notification-list"><div class="text-muted small p-3">Loading…</div></div>
+          </div>
+        </div>
+        <div class="rt-user">
+          <div class="rt-avatar">{{ (user.name[:1] if user and user.name else "U")|upper }}</div>
+          <div class="rt-user-text"><b>{{ user.name }}</b><small>{{ user.role }}</small></div>
+          <a class="rt-logout" href="{{ url_for('logout') }}" title="Log off"><i class="bi bi-box-arrow-right"></i><span>Log off</span></a>
+        </div>
+      </div>
+    </header>
+    <div class="rt-content">
+      <div class="rt-page-head"><div><h1>{{ shell_meta[0] }}</h1><p>{{ shell_meta[1] }}</p></div>{% if request.endpoint != 'dashboard' %}<a class="btn btn-light border btn-sm rt-back-btn" href="{{url_for('dashboard')}}" data-back-fallback="{{url_for('dashboard')}}"><i class="bi bi-arrow-left me-1"></i>Back</a>{% endif %}</div>
+{% endif %}
+      {% with messages=get_flashed_messages(with_categories=true) %}
+        {% for cat,msg in messages %}
+        <div class="alert alert-{{ 'danger' if cat=='danger' else ('warning' if cat=='warning' else 'success') }} alert-dismissible fade show" role="alert">{{msg}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
+        {% endfor %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+{% if normal_shell %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% if normal_shell and request.endpoint != 'dashboard' %}
+<div class="dropup rt-quick" id="quickActions">
+  <button class="rt-quick-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Quick actions"><i class="bi bi-lightning-charge-fill"></i></button>
+  <ul class="dropdown-menu dropdown-menu-end shadow">
+    {% if can_manage_candidates %}<li><a class="dropdown-item" href="{{url_for('add_candidate')}}"><i class="bi bi-person-plus me-2"></i>Add Candidate</a></li>{% endif %}
+    <li><a class="dropdown-item" href="{{url_for('jobs')}}"><i class="bi bi-briefcase me-2"></i>Positions &amp; JD</a></li>
+    <li><a class="dropdown-item" href="{{url_for('calendar_view')}}?new=1"><i class="bi bi-calendar-plus me-2"></i>Schedule Interview</a></li>
+    <li><a class="dropdown-item" href="{{url_for('ai_center')}}"><i class="bi bi-stars me-2"></i>AI Screening</a></li>
+    <li><a class="dropdown-item" href="{{url_for('applications')}}"><i class="bi bi-kanban me-2"></i>Applications</a></li>
+    <li><a class="dropdown-item" href="{{url_for('candidates')}}"><i class="bi bi-people me-2"></i>All Candidates</a></li>
+    <li><a class="dropdown-item" href="{{url_for('reports')}}"><i class="bi bi-bar-chart me-2"></i>Reports</a></li>
+  </ul>
+</div>
+{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static',filename='app.js') }}" defer></script>
+{% if normal_shell %}<script src="{{ url_for('static',filename='voice_assistant.js') }}" defer></script>{% endif %}
+{% if request.endpoint in ['candidate_panel','interviewer_panel'] %}<script src="{{ url_for('static',filename='portal.js') }}" defer></script>{% endif %}
+{% if not normal_shell and not request.args.get('popup') and request.endpoint not in ['candidate_panel','interviewer_panel','meeting_room'] %}<a class="btn btn-light border btn-sm rt-back-float" href="{{ url_for('candidate_panel') if is_candidate_portal else url_for('interviewer_panel') }}" data-back-fallback="{{ url_for('candidate_panel') if is_candidate_portal else url_for('interviewer_panel') }}"><i class="bi bi-arrow-left me-1"></i>Back</a>{% endif %}
+{% if not normal_shell and not request.args.get('popup') %}<button class="theme-toggle theme-toggle-float" id="themeToggleBtn" type="button" title="Switch day / night mode" aria-label="Switch day / night mode"><i class="bi bi-moon-stars-fill"></i><i class="bi bi-sun-fill"></i></button>{% endif %}
+{% else %}
+{% block auth %}{% endblock %}
+{% if request.endpoint in ['signup','forgot_password','login_2fa','login_2fa_setup','force_password_change'] %}<a class="btn btn-light border btn-sm rt-back-float" href="{{url_for('login')}}" data-back-fallback="{{url_for('login')}}"><i class="bi bi-arrow-left me-1"></i>Back</a>{% endif %}
+<button class="theme-toggle theme-toggle-float" id="themeToggleBtn" type="button" title="Switch day / night mode" aria-label="Switch day / night mode"><i class="bi bi-moon-stars-fill"></i><i class="bi bi-sun-fill"></i></button>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static',filename='app.js') }}" defer></script>
+{% endif %}
+</body>
+</html>

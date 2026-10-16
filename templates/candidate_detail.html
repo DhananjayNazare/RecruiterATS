@@ -1,0 +1,89 @@
+{% extends "base.html" %}{% block content %}
+<div class="row g-3">
+  <div class="col-12 col-lg-5">
+    <div class="card">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <img class="candidate-photo candidate-photo-lg candidate-photo-clickable" role="button" tabindex="0" data-bs-toggle="modal" data-bs-target="#candidateImageModal" data-image-url="{% if candidate.photo %}{{url_for('uploads',name=candidate.photo)}}{% else %}{{url_for('static',filename='img/avatar-placeholder.svg')}}{% endif %}" data-candidate-name="{{candidate.name|e}}" alt="{{candidate.name}}"
+               src="{% if candidate.photo %}{{url_for('uploads',name=candidate.photo)}}{% else %}{{url_for('static',filename='img/avatar-placeholder.svg')}}{% endif %}"
+               onerror="this.src='{{url_for('static',filename='img/avatar-placeholder.svg')}}'">
+          <div>
+            <h5 class="fw-bold mb-1" id="candidateNameValue">{{candidate.name}}</h5>
+            <p class="text-muted mb-0"><span id="candidateEmailValue">{{candidate.email}}</span> &middot; <span id="candidatePhoneValue">{{candidate.phone}}</span></p>
+            {% if can_manage_candidates %}
+            <form method="post" action="{{url_for('candidate_photo',cid=candidate.id)}}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 mt-2" id="photoForm">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <input type="file" name="photo" id="photoInput" accept="image/png,image/jpeg,image/webp,image/gif" class="d-none" onchange="this.form.submit()">
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('photoInput').click()"><i class="bi bi-camera me-1"></i>{{'Change photo' if candidate.photo else 'Add photo'}}</button>
+              {% if candidate.photo %}<button type="submit" name="remove_photo" value="1" class="btn btn-outline-secondary btn-sm" onclick="return confirm('Remove this photo?')"><i class="bi bi-trash me-1"></i>Remove</button>{% endif %}
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        <dl class="kv mb-3">
+          <dt>Skills</dt><dd id="candidateSkillsValue">{{candidate.skills or "—"}}</dd>
+          <dt>Experience</dt><dd id="candidateExperienceValue">{{candidate.experience_years or 0}} years</dd>
+          <dt>Education</dt><dd id="candidateEducationValue">{{candidate.education or "—"}}</dd>
+        </dl>
+        {% if candidate.resume_file %}<a class="btn btn-outline-secondary btn-sm mb-3" href="{{url_for('uploads',name=candidate.resume_file)}}"><i class="bi bi-file-earmark-text me-1"></i>Open Resume</a><br>{% endif %}
+        <form method="post" action="{{url_for('scan_candidate_pdf',cid=candidate.id)}}" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 mb-3">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <input type="file" class="form-control form-control-sm" name="resume_pdf" accept="application/pdf" required style="max-width:250px">
+          <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i>Scan PDF (No AI)</button>
+        </form><br>
+        <a href="{{url_for('edit_candidate',cid=candidate.id)}}" class="btn btn-outline-primary"><i class="bi bi-pencil-square me-1"></i>Edit Candidate</a>
+        <form method="post" action="{{url_for('ai_resume',cid=candidate.id)}}" class="ajax-form d-inline-block" data-target="resume-result">
+          <button type="submit" class="btn btn-primary"><i class="bi bi-stars me-1"></i>AI Parse / Analyze Resume</button>
+        </form>
+        <form method="post" action="{{url_for('delete_candidate',cid=candidate.id)}}" class="d-inline-block" onsubmit="return confirm('Delete this candidate? Their applications and interviews will also be removed.');">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Delete Candidate</button>
+        </form>
+        <div id="resume-result"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-7">
+    <div class="card mb-3">
+      <div class="card-header py-3 px-4">AI Summary</div>
+      <div class="card-body p-4">
+        <p class="mb-0" id="candidateAiSummary">{{candidate.ai_summary or "Run AI Resume Parser to generate a structured summary."}}</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header py-3 px-4">Applications</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table mb-0">
+          <tr><th class="ps-4">Position</th><th>Status</th><th>AI Score</th><th class="pe-4">Actions</th></tr>
+          {% for a in applications %}
+          <tr>
+            <td class="ps-4">{{a.job}}</td><td><span class="pill">{{a.status}}</span></td><td>{{a.match_score or '—'}}</td>
+            <td class="pe-4">
+              <form method="post" action="{{url_for('delete_application',aid=a.id)}}" onsubmit="return confirm('Remove this application?');">
+                <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+                <input type="hidden" name="next" value="candidate">
+                <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-muted ps-4">No applications.</td></tr>
+          {% endfor %}
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="candidateImageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content candidate-image-modal">
+      <div class="modal-header"><h5 class="modal-title" id="candidateImageModalTitle">Candidate Photo</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body text-center p-4"><img id="candidateImageModalImg" class="candidate-image-pop" alt="Candidate photo"></div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

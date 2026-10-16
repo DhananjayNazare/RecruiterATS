@@ -1,0 +1,160 @@
+{% extends "base.html" %}{% block content %}
+{% if can_manage_jobs %}
+<div class="d-flex justify-content-end mb-3">
+  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createPositionModal"><i class="bi bi-plus-lg me-1"></i>Create Position</button>
+</div>
+<div class="modal fade" id="createPositionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-briefcase me-2 text-primary"></i>Create Position</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form class="row g-3" id="createPositionForm" method="post" action="{{url_for('add_job')}}" enctype="multipart/form-data">
+          <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+          <div class="col-12 col-md-6"><input class="form-control" name="title" placeholder="Position name" required></div>
+          <div class="col-6 col-md-3">
+            <select class="form-select" name="company_id"><option value="">Company</option>{% for x in companies %}<option value="{{x.id}}">{{x.name}}</option>{% endfor %}</select>
+          </div>
+          <div class="col-6 col-md-3">
+            <input class="form-control" name="category_name" list="categoriesDatalist" placeholder="Category (type or select)" autocomplete="off">
+            <datalist id="categoriesDatalist">{% for x in categories %}<option value="{{x.name}}">{% endfor %}</datalist>
+          </div>
+          <div class="col-6 col-md-3">
+            <input class="form-control" name="location" list="locationsDatalist" placeholder="Location" autocomplete="off">
+            <datalist id="locationsDatalist">{% for x in locations %}<option value="{{x.name}}">{% endfor %}</datalist>
+          </div>
+          <div class="col-6 col-md-3">
+            <select class="form-select" name="employment_type"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option></select>
+          </div>
+          <div class="col-12 col-md-6">
+            <input class="form-control" type="file" name="jd_file" accept=".pdf,.docx,.txt">
+            <div class="form-text">Attach the JD (PDF, DOCX or TXT, max 2 MB). AI Screening uses it automatically. You can also paste the JD below, or attach it later by clicking the position.</div>
+          </div>
+          <div class="col-12"><textarea class="form-control" name="description" placeholder="Job description (optional when a JD file is attached)" rows="3"></textarea></div>
+          <div class="col-12"><textarea class="form-control" name="requirements" placeholder="Required skills, experience and qualifications" rows="3"></textarea></div>
+          <div class="col-12 d-flex justify-content-end gap-2"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>Create Position</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header py-3 px-4 d-flex justify-content-between align-items-center">
+    <span>Positions</span><span class="small text-muted">Click a position to view / attach its JD</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <tr><th class="ps-4">Position</th><th>Company</th><th>Location</th><th>JD</th><th>Candidates</th><th>Status</th><th class="pe-4">Actions</th></tr>
+      {% for j in jobs %}
+      <tr>
+        <td class="ps-4"><a href="#" class="fw-semibold text-decoration-none position-link" data-position-id="{{j.id}}">{{j.title}}</a></td>
+        <td>{{j.company or '—'}}</td><td>{{j.location or '—'}}</td>
+        <td>{% if j.jd_file %}<span class="pill" title="{{j.jd_original_name}}"><i class="bi bi-paperclip"></i> Attached</span>{% else %}<span class="text-muted small">Text only</span>{% endif %}</td>
+        <td>{{j.application_count}}</td>
+        <td><span class="pill">{{j.status}}</span></td>
+        <td class="pe-4">
+          {% if can_manage_jobs %}
+          <form method="post" action="{{url_for('delete_job',jid=j.id)}}" onsubmit="return confirm('Delete this position? Its applications and interviews will also be removed.');">
+            <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+            <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1"></i>Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-muted ps-4">No positions yet.</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="positionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="posTitle">Position</h5>
+          <div class="small text-muted" id="posMeta"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-4">
+          <div class="col-12 col-lg-7">
+            <form method="post" enctype="multipart/form-data" id="posForm">
+              <input type="hidden" name="_csrf_token" value="{{csrf_token}}">
+              <div class="row g-3">
+                <div class="col-12 col-md-8"><label class="form-label fw-semibold small">Position name</label><input class="form-control" name="title" id="posName" {% if not can_manage_jobs %}readonly{% endif %}></div>
+                <div class="col-12 col-md-4"><label class="form-label fw-semibold small">Status</label>
+                  <select class="form-select" name="status" id="posStatus" {% if not can_manage_jobs %}disabled{% endif %}><option>Open</option><option>On Hold</option><option>Closed</option></select></div>
+                <div class="col-12">
+                  <label class="form-label fw-semibold small">Job Description (JD) file</label>
+                  <div class="jd-current mb-2" id="posFile"></div>
+                  {% if can_manage_jobs %}<input class="form-control" type="file" name="jd_file" accept=".pdf,.docx,.txt">
+                  <div class="form-text">Attach or replace the JD (PDF, DOCX, TXT, max 2 MB). Candidates screened for this position are scored against it.</div>{% endif %}
+                </div>
+                <div class="col-12"><label class="form-label fw-semibold small">Job description text</label><textarea class="form-control" name="description" id="posDesc" rows="7" {% if not can_manage_jobs %}readonly{% endif %}></textarea></div>
+                <div class="col-12"><label class="form-label fw-semibold small">Requirements</label><textarea class="form-control" name="requirements" id="posReq" rows="3" {% if not can_manage_jobs %}readonly{% endif %}></textarea></div>
+                {% if can_manage_jobs %}<div class="col-12"><button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Save JD</button></div>{% endif %}
+              </div>
+            </form>
+          </div>
+          <div class="col-12 col-lg-5">
+            <div class="border rounded-3 p-3 mb-3 bg-light-subtle">
+              <div class="fw-semibold mb-2"><i class="bi bi-stars text-primary me-1"></i>Screen candidates for this position</div>
+              <p class="small text-muted mb-3">AI reads each resume, scores it against this JD, and if the score reaches the threshold it books a free interview slot and emails the candidate.</p>
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-primary btn-sm" id="posScreenLink" href="#"><i class="bi bi-stars me-1"></i>AI Screening</a>
+                <a class="btn btn-outline-primary btn-sm" id="posBatchLink" href="#"><i class="bi bi-files me-1"></i>Batch resumes</a>
+                <a class="btn btn-outline-secondary btn-sm" id="posCandLink" href="#"><i class="bi bi-people me-1"></i>View candidates</a>
+              </div>
+            </div>
+            <div class="fw-semibold mb-2">Candidates on this position</div>
+            <div id="posApps" class="small"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const POSITIONS = {{ positions|tojson }};
+document.addEventListener('DOMContentLoaded', function () {
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const modalEl = document.getElementById('positionModal');
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  function openPosition(id) {
+    const p = POSITIONS.find(x => x.id === Number(id));
+    if (!p) return;
+    document.getElementById('posTitle').textContent = p.title;
+    document.getElementById('posMeta').textContent = [p.company, p.location, p.employment_type, p.category].filter(Boolean).join(' · ');
+    document.getElementById('posName').value = p.title;
+    document.getElementById('posStatus').value = p.status || 'Open';
+    document.getElementById('posDesc').value = p.description;
+    document.getElementById('posReq').value = p.requirements;
+    document.getElementById('posForm').action = '/positions/' + p.id + '/jd';
+    document.getElementById('posFile').innerHTML = p.jd_file
+      ? '<i class="bi bi-file-earmark-text me-1"></i><a href="/uploads/' + encodeURIComponent(p.jd_file) + '" target="_blank" rel="noopener">' + esc(p.jd_original_name || 'Open JD') + '</a><span class="text-muted small ms-2">attached ' + esc((p.jd_updated_at || '').replace('T', ' ')) + '</span>'
+      : '<span class="text-muted small">No JD file attached yet. The JD text below is used for screening.</span>';
+    document.getElementById('posScreenLink').href = '/ai?position=' + p.id;
+    document.getElementById('posBatchLink').href = '/dashboard?open=batch&position=' + p.id;
+    document.getElementById('posCandLink').href = '/candidates?position=' + p.id;
+    document.getElementById('posApps').innerHTML = p.applications.length
+      ? '<table class="table table-sm mb-0"><thead><tr><th>Candidate</th><th>Status</th><th>Score</th></tr></thead><tbody>' +
+        p.applications.map(a => '<tr><td><a href="/candidates/' + a.candidate_id + '">' + esc(a.candidate) + '</a></td><td>' + esc(a.status) + '</td><td>' + (a.match_score ?? '—') + '</td></tr>').join('') +
+        '</tbody></table>' + (p.application_count > p.applications.length ? '<div class="text-muted small mt-1">Showing top ' + p.applications.length + ' of ' + p.application_count + '</div>' : '')
+      : '<div class="text-muted">No candidates screened for this position yet.</div>';
+    modal.show();
+  }
+  document.querySelectorAll('.position-link').forEach(a => a.addEventListener('click', e => { e.preventDefault(); openPosition(a.dataset.positionId); }));
+  const open = new URLSearchParams(location.search).get('open');
+  if (open) openPosition(open);
+});
+</script>
+{% endblock %}
